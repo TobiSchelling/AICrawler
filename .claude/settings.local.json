@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -m pytest:*)",
+      "Bash(source .venv/bin/activate)",
+      "Bash(python:*)",
+      "Bash(curl:*)",
+      "Bash(sqlite3:*)",
+      "Bash(/Users/tobias/GIT_ROOT/GIT_HUB/AICrawler/.venv/bin/python:*)",
+      "Bash(/Users/tobias/GIT_ROOT/GIT_HUB/AICrawler/.venv/bin/pytest --co -q tests/)",
+      "Bash(find:*)",
+      "Bash(/Users/tobias/GIT_ROOT/GIT_HUB/AICrawler/.venv/bin/pytest:*)",
+      "Bash(/Users/tobias/GIT_ROOT/GIT_HUB/AICrawler/.venv/bin/ruff check:*)",
+      "Bash(ls:*)",
+      "Bash(xargs:*)",
+      "WebSearch",
+      "WebFetch(domain:steipete.me)",
+      "WebFetch(domain:steve-yegge.medium.com)",
+      "WebFetch(domain:simonwillison.net)",
+      "Bash(.venv/bin/python:*)",
+      "Bash(.venv/bin/aicrawler collect:*)",
+      "Bash(git add:*)"
+    ]
+  }
+}

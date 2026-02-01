@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block title %}Archive - AI Briefing{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1>Weekly Briefings</h1>
+
+    {% if briefings %}
+    <div class="archive-list">
+        {% for b in briefings %}
+        <a href="{{ url_for('briefing', week=b.week_number) }}" class="archive-item">
+            <div class="archive-week">{{ b.week_number }}</div>
+            <div class="archive-date">{{ b.week_number | week_date_range }}</div>
+            <div class="archive-meta">
+                <span>{{ b.storyline_count }} storylines</span>
+                <span>{{ b.article_count }} articles</span>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <p>No briefings yet.</p>
+        <p>Run <code>aicrawler run</code> to collect and process articles.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

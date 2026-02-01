@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block title %}{{ week }} - AI Briefing{% endblock %}
+
+{% block content %}
+<div class="container">
+    {% if briefing %}
+    <article class="briefing">
+        <header class="briefing-header">
+            <h1>AI Briefing: {{ week }}</h1>
+            <p class="briefing-meta">
+                {{ week | week_date_range }}
+                &middot; {{ briefing.storyline_count }} storylines
+                &middot; {{ briefing.article_count }} articles
+            </p>
+        </header>
+
+        {% if briefing.tldr %}
+        <section class="briefing-tldr">
+            <h2>TL;DR</h2>
+            <div class="tldr-content">
+                {{ briefing.tldr | markdown | safe }}
+            </div>
+        </section>
+        {% endif %}
+
+        <section class="briefing-body">
+            {{ briefing.body_markdown | markdown | safe }}
+        </section>
+    </article>
+
+    <nav class="briefing-nav">
+        <a href="{{ url_for('index') }}">&larr; All briefings</a>
+    </nav>
+
+    {% else %}
+    <div class="empty-state">
+        <h1>{{ week }}</h1>
+        <p>No briefing available for this week.</p>
+        <p>Run <code>aicrawler run</code> to generate it.</p>
+        <a href="{{ url_for('index') }}">&larr; Back to archive</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,38 @@
+@startuml
+!define RECTANGLE class
+
+RECTANGLE User
+RECTANGLE CLI_Tool
+RECTANGLE Scheduler
+RECTANGLE ArticleCollector
+RECTANGLE FeedParser
+RECTANGLE WebScraper
+RECTANGLE APIClient
+RECTANGLE ArticleFilter
+RECTANGLE NLPTagger
+RECTANGLE Summarizer
+RECTANGLE Aggregator
+RECTANGLE ReportGenerator
+RECTANGLE AsciiDocExporter
+RECTANGLE Database
+RECTANGLE FileStorage
+
+User --> CLI_Tool : interacts
+CLI_Tool --> Scheduler : triggers/manual run
+Scheduler --> ArticleCollector : schedule jobs
+ArticleCollector --> FeedParser : get RSS/Atom
+ArticleCollector --> WebScraper : scrape sites
+ArticleCollector --> APIClient : fetch via API
+FeedParser --> Database : store articles
+WebScraper --> Database : store articles
+APIClient --> Database : store articles
+
+Database --> ArticleFilter : provide articles
+ArticleFilter --> NLPTagger : tag/categorize
+NLPTagger --> Summarizer : pass filtered/tagged articles
+Summarizer --> Aggregator : summarized articles
+Aggregator --> ReportGenerator : weekly digest
+ReportGenerator --> AsciiDocExporter : format as asciidoc
+AsciiDocExporter --> FileStorage : save .adoc file
+
+@enduml
