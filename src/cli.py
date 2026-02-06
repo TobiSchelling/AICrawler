@@ -74,8 +74,9 @@ def collect(ctx: click.Context) -> None:
 
 @main.command()
 @click.option("--dry-run", is_flag=True, help="Show what would be done without executing")
+@click.option("--days-back", type=int, default=None, help="Override lookback window (days)")
 @click.pass_context
-def run(ctx: click.Context, dry_run: bool) -> None:
+def run(ctx: click.Context, dry_run: bool, days_back: int | None) -> None:
     """Run the full pipeline: collect -> fetch -> triage -> cluster -> synthesize -> compose."""
     from .collector import ArticleCollector
     from .database import get_db, get_today, make_period_id
@@ -84,9 +85,15 @@ def run(ctx: click.Context, dry_run: bool) -> None:
     db = get_db()
     today = get_today()
 
-    # Catch-up detection
-    last_run = db.get_last_run_date()
-    if last_run is None:
+    # Explicit --days-back override
+    if days_back is not None:
+        if days_back == 1:
+            period_id = today
+        else:
+            start = (date.fromisoformat(today) - timedelta(days=days_back - 1)).isoformat()
+            period_id = make_period_id(start, today)
+        click.echo(f"Collecting {days_back} day(s) of articles ({period_id}).")
+    elif (last_run := db.get_last_run_date()) is None:
         click.echo("First run detected — collecting today's articles.")
         period_id = today
         days_back = 1
