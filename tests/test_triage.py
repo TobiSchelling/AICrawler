@@ -1,8 +1,7 @@
 """Tests for the triage module."""
 
-from unittest.mock import MagicMock
-
 import json
+from unittest.mock import MagicMock
 
 from src.triage import ArticleTriager
 
@@ -14,7 +13,7 @@ def test_triage_relevant_article(temp_db):
         url="https://example.com/test",
         title="How We Use Claude for Code Review",
         content="A detailed experience report about using AI for code review...",
-        week_number="2026-W05",
+        period_id="2026-02-06",
     )
 
     # Mock the LLM provider
@@ -28,7 +27,7 @@ def test_triage_relevant_article(temp_db):
     })
 
     triager = ArticleTriager(config={}, db=temp_db, provider=mock_provider)
-    result = triager.triage_articles("2026-W05")
+    result = triager.triage_articles("2026-02-06")
 
     assert result.processed == 1
     assert result.relevant == 1
@@ -45,7 +44,7 @@ def test_triage_skip_article(temp_db):
         url="https://example.com/funding",
         title="AI Startup Raises $500M",
         content="Funding announcement for yet another AI company...",
-        week_number="2026-W05",
+        period_id="2026-02-06",
     )
 
     mock_provider = MagicMock()
@@ -58,7 +57,7 @@ def test_triage_skip_article(temp_db):
     })
 
     triager = ArticleTriager(config={}, db=temp_db, provider=mock_provider)
-    result = triager.triage_articles("2026-W05")
+    result = triager.triage_articles("2026-02-06")
 
     assert result.processed == 1
     assert result.relevant == 0
@@ -71,14 +70,14 @@ def test_triage_handles_unparseable_response(temp_db):
         url="https://example.com/test",
         title="Test Article",
         content="Some content",
-        week_number="2026-W05",
+        period_id="2026-02-06",
     )
 
     mock_provider = MagicMock()
     mock_provider.generate.return_value = "This is not JSON at all"
 
     triager = ArticleTriager(config={}, db=temp_db, provider=mock_provider)
-    result = triager.triage_articles("2026-W05")
+    result = triager.triage_articles("2026-02-06")
 
     assert result.processed == 1
     assert result.relevant == 1  # defaults to relevant
@@ -90,13 +89,13 @@ def test_triage_skips_already_triaged(temp_db):
         url="https://example.com/test",
         title="Already Triaged",
         content="Content",
-        week_number="2026-W05",
+        period_id="2026-02-06",
     )
     temp_db.insert_triage(article_id=aid, verdict="relevant", practical_score=3)
 
     mock_provider = MagicMock()
     triager = ArticleTriager(config={}, db=temp_db, provider=mock_provider)
-    result = triager.triage_articles("2026-W05")
+    result = triager.triage_articles("2026-02-06")
 
     assert result.processed == 0
     mock_provider.generate.assert_not_called()
@@ -109,8 +108,8 @@ def test_triage_no_provider(temp_db):
     triager.provider = None
 
     temp_db.insert_article(
-        url="https://example.com/test", title="Test", content="C", week_number="2026-W05"
+        url="https://example.com/test", title="Test", content="C", period_id="2026-02-06"
     )
 
-    result = triager.triage_articles("2026-W05")
+    result = triager.triage_articles("2026-02-06")
     assert result.errors == 1

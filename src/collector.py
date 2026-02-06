@@ -4,7 +4,7 @@ import logging
 from dataclasses import dataclass
 
 from .api_client import NewsAPIClient
-from .database import Database, get_current_week, get_db
+from .database import Database, get_db, get_today
 from .feed_parser import FeedParser
 
 logger = logging.getLogger(__name__)
@@ -23,9 +23,10 @@ class CollectionResult:
 class ArticleCollector:
     """Orchestrates article collection from RSS feeds and NewsAPI."""
 
-    def __init__(self, config: dict, db: Database | None = None):
+    def __init__(self, config: dict, db: Database | None = None, days_back: int = 1):
         self.config = config
         self.db = db or get_db()
+        self.days_back = days_back
 
         sources_config = config.get("sources", {})
 
@@ -46,9 +47,10 @@ class ArticleCollector:
             self.news_client = None
             self.news_query = ""
 
-    def collect(self) -> CollectionResult:
+    def collect(self, period_id: str | None = None) -> CollectionResult:
         """Collect articles from all configured sources."""
-        week_number = get_current_week()
+        if period_id is None:
+            period_id = get_today()
         total_found = 0
         new_articles = 0
         duplicates = 0
@@ -67,7 +69,7 @@ class ArticleCollector:
                     source=entry.source,
                     published_date=entry.published_date,
                     content=entry.content,
-                    week_number=week_number,
+                    period_id=period_id,
                 )
                 if result:
                     new_articles += 1
@@ -88,9 +90,12 @@ class ArticleCollector:
                 news_articles = self.news_client.search_with_priorities(
                     base_query=self.news_query,
                     priorities=priorities,
+                    days_back=self.days_back,
                 )
             else:
-                news_articles = self.news_client.search(self.news_query)
+                news_articles = self.news_client.search(
+                    self.news_query, days_back=self.days_back
+                )
 
             total_found += len(news_articles)
 
@@ -101,7 +106,7 @@ class ArticleCollector:
                     source=article.source,
                     published_date=article.published_date,
                     content=article.content,
-                    week_number=week_number,
+                    period_id=period_id,
                 )
                 if result:
                     new_articles += 1

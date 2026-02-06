@@ -10,11 +10,11 @@ logger = logging.getLogger(__name__)
 
 BRIEFLY_NOTED_LABEL = "Briefly Noted"
 
-SYNTHESIS_PROMPT = """You are writing one section of a weekly AI news briefing for software practitioners.
+SYNTHESIS_PROMPT = """You are writing one section of a daily AI news briefing for software practitioners.
 
 This section covers a storyline about: {label}
 
-Write a cohesive 2-3 paragraph narrative that weaves these articles together. Write as if you're a well-informed colleague explaining what happened this week. Be specific about tools, techniques, and outcomes. Avoid marketing language.
+Write a cohesive 2-3 paragraph narrative that weaves these articles together. Write as if you're a well-informed colleague explaining what happened recently. Be specific about tools, techniques, and outcomes. Avoid marketing language.
 
 Articles in this storyline:
 {articles}
@@ -50,15 +50,15 @@ class StorylineSynthesizer:
         self.db = db or get_db()
         self.provider = provider or create_provider(config)
 
-    def synthesize_week(self, week_number: str) -> SynthesisResult:
-        """Synthesize narratives for all storylines in a week."""
+    def synthesize_period(self, period_id: str) -> SynthesisResult:
+        """Synthesize narratives for all storylines in a period."""
         if not self.provider:
             logger.error("No LLM provider available for synthesis")
             return SynthesisResult(narratives_created=0, errors=1)
 
-        storylines = self.db.get_storylines_for_week(week_number)
+        storylines = self.db.get_storylines_for_period(period_id)
         if not storylines:
-            logger.info("No storylines to synthesize for %s", week_number)
+            logger.info("No storylines to synthesize for %s", period_id)
             return SynthesisResult(narratives_created=0, errors=0)
 
         created = 0
@@ -78,9 +78,9 @@ class StorylineSynthesizer:
 
             try:
                 if storyline.label == BRIEFLY_NOTED_LABEL:
-                    self._synthesize_briefly_noted(storyline, articles, week_number)
+                    self._synthesize_briefly_noted(storyline, articles, period_id)
                 else:
-                    self._synthesize_storyline(storyline, articles, week_number)
+                    self._synthesize_storyline(storyline, articles, period_id)
                 created += 1
             except Exception as e:
                 logger.error("Error synthesizing storyline %d: %s", storyline.id, e)
@@ -96,7 +96,7 @@ class StorylineSynthesizer:
         self,
         storyline: Storyline,
         articles: list[Article],
-        week_number: str,
+        period_id: str,
     ) -> None:
         """Synthesize a narrative for a regular storyline."""
         articles_text = self._format_articles(articles)
@@ -124,7 +124,7 @@ class StorylineSynthesizer:
 
         self.db.insert_storyline_narrative(
             storyline_id=storyline.id,
-            week_number=week_number,
+            period_id=period_id,
             title=title,
             narrative_text=narrative,
             source_references=refs,
@@ -134,7 +134,7 @@ class StorylineSynthesizer:
         self,
         storyline: Storyline,
         articles: list[Article],
-        week_number: str,
+        period_id: str,
     ) -> None:
         """Create a bullet-point summary for unclustered articles."""
         bullets = []
@@ -154,7 +154,7 @@ class StorylineSynthesizer:
 
         self.db.insert_storyline_narrative(
             storyline_id=storyline.id,
-            week_number=week_number,
+            period_id=period_id,
             title=BRIEFLY_NOTED_LABEL,
             narrative_text=narrative,
             source_references=refs,

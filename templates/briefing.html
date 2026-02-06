@@ -1,15 +1,15 @@
 {% extends "base.html" %}
 
-{% block title %}{{ week }} - AI Briefing{% endblock %}
+{% block title %}{{ period_id }} - AI Briefing{% endblock %}
 
 {% block content %}
 <div class="container">
     {% if briefing %}
     <article class="briefing">
         <header class="briefing-header">
-            <h1>AI Briefing: {{ week }}</h1>
+            <h1>AI Briefing: {{ period_id | format_period }}</h1>
             <p class="briefing-meta">
-                {{ week | week_date_range }}
+                {{ period_id }}
                 &middot; {{ briefing.storyline_count }} storylines
                 &middot; {{ briefing.article_count }} articles
             </p>
@@ -35,8 +35,8 @@
 
     {% else %}
     <div class="empty-state">
-        <h1>{{ week }}</h1>
-        <p>No briefing available for this week.</p>
+        <h1>{{ period_id | format_period }}</h1>
+        <p>No briefing available for this period.</p>
         <p>Run <code>aicrawler run</code> to generate it.</p>
         <a href="{{ url_for('index') }}">&larr; Back to archive</a>
     </div>

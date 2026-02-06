@@ -6,7 +6,7 @@ from pathlib import Path
 import markdown
 from flask import Flask, redirect, render_template, request, url_for
 
-from .database import get_db, get_week_date_range
+from .database import format_period_display, get_db
 
 # Determine paths relative to this file
 SRC_DIR = Path(__file__).parent
@@ -32,9 +32,9 @@ def render_markdown(text: str) -> str:
     return md.convert(text)
 
 
-# Register template filter
+# Register template filters
 app.jinja_env.filters["markdown"] = render_markdown
-app.jinja_env.filters["week_date_range"] = get_week_date_range
+app.jinja_env.filters["format_period"] = format_period_display
 
 
 # --- Routes ---
@@ -42,30 +42,30 @@ app.jinja_env.filters["week_date_range"] = get_week_date_range
 
 @app.route("/")
 def index():
-    """Archive page listing all weekly briefings."""
+    """Archive page listing all briefings."""
     db = get_db()
     briefings = db.get_all_briefings()
 
     return render_template("index.html", briefings=briefings)
 
 
-@app.route("/briefing/<week>")
-def briefing(week: str):
-    """Display a weekly briefing."""
+@app.route("/briefing/<period_id>")
+def briefing(period_id: str):
+    """Display a briefing."""
     db = get_db()
-    brief = db.get_briefing(week)
+    brief = db.get_briefing(period_id)
 
     if not brief:
         return render_template(
             "briefing.html",
             briefing=None,
-            week=week,
+            period_id=period_id,
         )
 
     return render_template(
         "briefing.html",
         briefing=brief,
-        week=week,
+        period_id=period_id,
     )
 
 

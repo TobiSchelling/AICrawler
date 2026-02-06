@@ -6,7 +6,7 @@ import shutil
 import sqlite3
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import date, datetime
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -25,7 +25,7 @@ class Article:
     published_date: str | None
     content: str | None
     content_fetched: bool
-    week_number: str | None
+    period_id: str | None
     collected_at: str | None
 
     @classmethod
@@ -38,7 +38,7 @@ class Article:
             published_date=row["published_date"],
             content=row["content"],
             content_fetched=bool(row["content_fetched"]),
-            week_number=row["week_number"],
+            period_id=row["period_id"],
             collected_at=row["collected_at"],
         )
 
@@ -74,7 +74,7 @@ class Storyline:
     """A cluster of related articles forming a storyline."""
 
     id: int | None
-    week_number: str
+    period_id: str
     label: str
     article_count: int
     created_at: str | None
@@ -83,7 +83,7 @@ class Storyline:
     def from_row(cls, row: sqlite3.Row) -> "Storyline":
         return cls(
             id=row["id"],
-            week_number=row["week_number"],
+            period_id=row["period_id"],
             label=row["label"],
             article_count=row["article_count"],
             created_at=row["created_at"],
@@ -96,7 +96,7 @@ class StorylineNarrative:
 
     id: int | None
     storyline_id: int
-    week_number: str
+    period_id: str
     title: str
     narrative_text: str
     source_references: list[dict]
@@ -108,7 +108,7 @@ class StorylineNarrative:
         return cls(
             id=row["id"],
             storyline_id=row["storyline_id"],
-            week_number=row["week_number"],
+            period_id=row["period_id"],
             title=row["title"],
             narrative_text=row["narrative_text"],
             source_references=refs,
@@ -117,11 +117,11 @@ class StorylineNarrative:
 
 
 @dataclass
-class WeeklyBriefing:
-    """A complete weekly briefing."""
+class Briefing:
+    """A complete briefing for a period."""
 
     id: int | None
-    week_number: str
+    period_id: str
     tldr: str
     body_markdown: str
     storyline_count: int
@@ -129,10 +129,10 @@ class WeeklyBriefing:
     generated_at: str | None
 
     @classmethod
-    def from_row(cls, row: sqlite3.Row) -> "WeeklyBriefing":
+    def from_row(cls, row: sqlite3.Row) -> "Briefing":
         return cls(
             id=row["id"],
-            week_number=row["week_number"],
+            period_id=row["period_id"],
             tldr=row["tldr"],
             body_markdown=row["body_markdown"],
             storyline_count=row["storyline_count"],
@@ -168,20 +168,20 @@ class ResearchPriority:
 
 
 @dataclass
-class WeeklyReport:
-    """Metadata about a weekly report."""
+class RunReport:
+    """Metadata about a pipeline run."""
 
     id: int | None
-    week_number: str
+    period_id: str
     generated_at: str | None
     article_count: int
     storyline_count: int
 
     @classmethod
-    def from_row(cls, row: sqlite3.Row) -> "WeeklyReport":
+    def from_row(cls, row: sqlite3.Row) -> "RunReport":
         return cls(
             id=row["id"],
-            week_number=row["week_number"],
+            period_id=row["period_id"],
             generated_at=row["generated_at"],
             article_count=row["article_count"],
             storyline_count=row["storyline_count"],
@@ -199,7 +199,7 @@ CREATE TABLE IF NOT EXISTS articles (
     published_date TEXT,
     content TEXT,
     content_fetched INTEGER DEFAULT 0,
-    week_number TEXT,
+    period_id TEXT,
     collected_at TEXT DEFAULT (datetime('now'))
 );
 
@@ -215,7 +215,7 @@ CREATE TABLE IF NOT EXISTS article_triage (
 
 CREATE TABLE IF NOT EXISTS storylines (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    week_number TEXT NOT NULL,
+    period_id TEXT NOT NULL,
     label TEXT NOT NULL,
     article_count INTEGER DEFAULT 0,
     created_at TEXT DEFAULT (datetime('now'))
@@ -230,16 +230,16 @@ CREATE TABLE IF NOT EXISTS storyline_articles (
 CREATE TABLE IF NOT EXISTS storyline_narratives (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     storyline_id INTEGER NOT NULL REFERENCES storylines(id),
-    week_number TEXT NOT NULL,
+    period_id TEXT NOT NULL,
     title TEXT NOT NULL,
     narrative_text TEXT NOT NULL,
     source_references TEXT,
     generated_at TEXT DEFAULT (datetime('now'))
 );
 
-CREATE TABLE IF NOT EXISTS weekly_briefings (
+CREATE TABLE IF NOT EXISTS briefings (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    week_number TEXT UNIQUE NOT NULL,
+    period_id TEXT UNIQUE NOT NULL,
     tldr TEXT NOT NULL,
     body_markdown TEXT NOT NULL,
     storyline_count INTEGER DEFAULT 0,
@@ -257,19 +257,19 @@ CREATE TABLE IF NOT EXISTS research_priorities (
     updated_at TEXT DEFAULT (datetime('now'))
 );
 
-CREATE TABLE IF NOT EXISTS weekly_reports (
+CREATE TABLE IF NOT EXISTS run_reports (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    week_number TEXT UNIQUE NOT NULL,
+    period_id TEXT UNIQUE NOT NULL,
     generated_at TEXT DEFAULT (datetime('now')),
     article_count INTEGER DEFAULT 0,
     storyline_count INTEGER DEFAULT 0
 );
 
-CREATE INDEX IF NOT EXISTS idx_articles_week ON articles(week_number);
+CREATE INDEX IF NOT EXISTS idx_articles_period ON articles(period_id);
 CREATE INDEX IF NOT EXISTS idx_articles_url ON articles(url);
-CREATE INDEX IF NOT EXISTS idx_storylines_week ON storylines(week_number);
-CREATE INDEX IF NOT EXISTS idx_storyline_narratives_week ON storyline_narratives(week_number);
-CREATE INDEX IF NOT EXISTS idx_weekly_briefings_week ON weekly_briefings(week_number);
+CREATE INDEX IF NOT EXISTS idx_storylines_period ON storylines(period_id);
+CREATE INDEX IF NOT EXISTS idx_storyline_narratives_period ON storyline_narratives(period_id);
+CREATE INDEX IF NOT EXISTS idx_briefings_period ON briefings(period_id);
 """
 
 
@@ -312,36 +312,36 @@ class Database:
         source: str | None = None,
         published_date: str | None = None,
         content: str | None = None,
-        week_number: str | None = None,
+        period_id: str | None = None,
     ) -> int | None:
         """Insert an article. Returns ID on success, None if duplicate."""
         with self.connection() as conn:
             try:
                 cursor = conn.execute(
-                    """INSERT INTO articles (url, title, source, published_date, content, week_number)
+                    """INSERT INTO articles (url, title, source, published_date, content, period_id)
                     VALUES (?, ?, ?, ?, ?, ?)""",
-                    (url, title, source, published_date, content, week_number),
+                    (url, title, source, published_date, content, period_id),
                 )
                 return cursor.lastrowid
             except sqlite3.IntegrityError:
                 return None
 
-    def get_articles_for_week(self, week_number: str) -> list[Article]:
+    def get_articles_for_period(self, period_id: str) -> list[Article]:
         with self.connection() as conn:
             rows = conn.execute(
-                "SELECT * FROM articles WHERE week_number = ? ORDER BY collected_at DESC",
-                (week_number,),
+                "SELECT * FROM articles WHERE period_id = ? ORDER BY collected_at DESC",
+                (period_id,),
             ).fetchall()
             return [Article.from_row(r) for r in rows]
 
-    def get_articles_needing_fetch(self, week_number: str | None = None) -> list[Article]:
+    def get_articles_needing_fetch(self, period_id: str | None = None) -> list[Article]:
         """Get articles with empty content that haven't been fetched yet."""
         query = """SELECT * FROM articles
             WHERE (content IS NULL OR content = '') AND content_fetched = 0"""
         params: list = []
-        if week_number:
-            query += " AND week_number = ?"
-            params.append(week_number)
+        if period_id:
+            query += " AND period_id = ?"
+            params.append(period_id)
         query += " ORDER BY collected_at DESC"
 
         with self.connection() as conn:
@@ -364,30 +364,30 @@ class Database:
                 (article_id,),
             )
 
-    def get_untriaged_articles(self, week_number: str | None = None) -> list[Article]:
+    def get_untriaged_articles(self, period_id: str | None = None) -> list[Article]:
         """Get articles that haven't been triaged yet."""
         query = """SELECT a.* FROM articles a
             LEFT JOIN article_triage t ON a.id = t.article_id
             WHERE t.article_id IS NULL"""
         params: list = []
-        if week_number:
-            query += " AND a.week_number = ?"
-            params.append(week_number)
+        if period_id:
+            query += " AND a.period_id = ?"
+            params.append(period_id)
         query += " ORDER BY a.collected_at DESC"
 
         with self.connection() as conn:
             rows = conn.execute(query, params).fetchall()
             return [Article.from_row(r) for r in rows]
 
-    def get_relevant_articles(self, week_number: str) -> list[Article]:
-        """Get articles triaged as relevant for a given week."""
+    def get_relevant_articles(self, period_id: str) -> list[Article]:
+        """Get articles triaged as relevant for a given period."""
         with self.connection() as conn:
             rows = conn.execute(
                 """SELECT a.* FROM articles a
                 JOIN article_triage t ON a.id = t.article_id
-                WHERE a.week_number = ? AND t.verdict = 'relevant'
+                WHERE a.period_id = ? AND t.verdict = 'relevant'
                 ORDER BY t.practical_score DESC""",
-                (week_number,),
+                (period_id,),
             ).fetchall()
             return [Article.from_row(r) for r in rows]
 
@@ -431,7 +431,7 @@ class Database:
             ).fetchone()
             return ArticleTriage.from_row(row) if row else None
 
-    def get_triage_stats(self, week_number: str) -> dict:
+    def get_triage_stats(self, period_id: str) -> dict:
         with self.connection() as conn:
             row = conn.execute(
                 """SELECT
@@ -440,8 +440,8 @@ class Database:
                     SUM(CASE WHEN verdict = 'skip' THEN 1 ELSE 0 END) as skipped
                 FROM article_triage t
                 JOIN articles a ON a.id = t.article_id
-                WHERE a.week_number = ?""",
-                (week_number,),
+                WHERE a.period_id = ?""",
+                (period_id,),
             ).fetchone()
             return {
                 "total": row["total"] or 0,
@@ -453,15 +453,15 @@ class Database:
 
     def insert_storyline(
         self,
-        week_number: str,
+        period_id: str,
         label: str,
         article_ids: list[int],
     ) -> int:
         with self.connection() as conn:
             cursor = conn.execute(
-                """INSERT INTO storylines (week_number, label, article_count)
+                """INSERT INTO storylines (period_id, label, article_count)
                 VALUES (?, ?, ?)""",
-                (week_number, label, len(article_ids)),
+                (period_id, label, len(article_ids)),
             )
             storyline_id = cursor.lastrowid
             for aid in article_ids:
@@ -471,11 +471,11 @@ class Database:
                 )
             return storyline_id
 
-    def get_storylines_for_week(self, week_number: str) -> list[Storyline]:
+    def get_storylines_for_period(self, period_id: str) -> list[Storyline]:
         with self.connection() as conn:
             rows = conn.execute(
-                "SELECT * FROM storylines WHERE week_number = ? ORDER BY article_count DESC",
-                (week_number,),
+                "SELECT * FROM storylines WHERE period_id = ? ORDER BY article_count DESC",
+                (period_id,),
             ).fetchall()
             return [Storyline.from_row(r) for r in rows]
 
@@ -497,11 +497,11 @@ class Database:
             ).fetchall()
             return [Article.from_row(r) for r in rows]
 
-    def clear_storylines_for_week(self, week_number: str) -> None:
-        """Remove existing storylines for a week (for re-clustering)."""
+    def clear_storylines_for_period(self, period_id: str) -> None:
+        """Remove existing storylines for a period (for re-clustering)."""
         with self.connection() as conn:
             storyline_ids = conn.execute(
-                "SELECT id FROM storylines WHERE week_number = ?", (week_number,)
+                "SELECT id FROM storylines WHERE period_id = ?", (period_id,)
             ).fetchall()
             for row in storyline_ids:
                 conn.execute(
@@ -510,14 +510,14 @@ class Database:
                 conn.execute(
                     "DELETE FROM storyline_narratives WHERE storyline_id = ?", (row["id"],)
                 )
-            conn.execute("DELETE FROM storylines WHERE week_number = ?", (week_number,))
+            conn.execute("DELETE FROM storylines WHERE period_id = ?", (period_id,))
 
     # --- Storyline Narratives ---
 
     def insert_storyline_narrative(
         self,
         storyline_id: int,
-        week_number: str,
+        period_id: str,
         title: str,
         narrative_text: str,
         source_references: list[dict] | None = None,
@@ -525,11 +525,11 @@ class Database:
         with self.connection() as conn:
             cursor = conn.execute(
                 """INSERT INTO storyline_narratives
-                (storyline_id, week_number, title, narrative_text, source_references)
+                (storyline_id, period_id, title, narrative_text, source_references)
                 VALUES (?, ?, ?, ?, ?)""",
                 (
                     storyline_id,
-                    week_number,
+                    period_id,
                     title,
                     narrative_text,
                     json.dumps(source_references) if source_references else None,
@@ -537,14 +537,14 @@ class Database:
             )
             return cursor.lastrowid
 
-    def get_narratives_for_week(self, week_number: str) -> list[StorylineNarrative]:
+    def get_narratives_for_period(self, period_id: str) -> list[StorylineNarrative]:
         with self.connection() as conn:
             rows = conn.execute(
                 """SELECT sn.* FROM storyline_narratives sn
                 JOIN storylines s ON s.id = sn.storyline_id
-                WHERE sn.week_number = ?
+                WHERE sn.period_id = ?
                 ORDER BY s.article_count DESC""",
-                (week_number,),
+                (period_id,),
             ).fetchall()
             return [StorylineNarrative.from_row(r) for r in rows]
 
@@ -556,11 +556,11 @@ class Database:
             ).fetchone()
             return StorylineNarrative.from_row(row) if row else None
 
-    # --- Weekly Briefings ---
+    # --- Briefings ---
 
     def insert_briefing(
         self,
-        week_number: str,
+        period_id: str,
         tldr: str,
         body_markdown: str,
         storyline_count: int,
@@ -568,41 +568,59 @@ class Database:
     ) -> int:
         with self.connection() as conn:
             cursor = conn.execute(
-                """INSERT OR REPLACE INTO weekly_briefings
-                (week_number, tldr, body_markdown, storyline_count, article_count)
+                """INSERT OR REPLACE INTO briefings
+                (period_id, tldr, body_markdown, storyline_count, article_count)
                 VALUES (?, ?, ?, ?, ?)""",
-                (week_number, tldr, body_markdown, storyline_count, article_count),
+                (period_id, tldr, body_markdown, storyline_count, article_count),
             )
             return cursor.lastrowid
 
-    def get_briefing(self, week_number: str) -> WeeklyBriefing | None:
+    def get_briefing(self, period_id: str) -> Briefing | None:
         with self.connection() as conn:
             row = conn.execute(
-                "SELECT * FROM weekly_briefings WHERE week_number = ?",
-                (week_number,),
+                "SELECT * FROM briefings WHERE period_id = ?",
+                (period_id,),
             ).fetchone()
-            return WeeklyBriefing.from_row(row) if row else None
+            return Briefing.from_row(row) if row else None
 
-    def get_all_briefings(self) -> list[WeeklyBriefing]:
+    def get_all_briefings(self) -> list[Briefing]:
         with self.connection() as conn:
             rows = conn.execute(
-                "SELECT * FROM weekly_briefings ORDER BY week_number DESC"
+                "SELECT * FROM briefings ORDER BY period_id DESC"
             ).fetchall()
-            return [WeeklyBriefing.from_row(r) for r in rows]
+            return [Briefing.from_row(r) for r in rows]
 
-    # --- Weekly Reports (metadata) ---
+    # --- Run Reports (metadata) ---
 
     def insert_report(
-        self, week_number: str, article_count: int, storyline_count: int
+        self, period_id: str, article_count: int, storyline_count: int
     ) -> int:
         with self.connection() as conn:
             cursor = conn.execute(
-                """INSERT OR REPLACE INTO weekly_reports
-                (week_number, article_count, storyline_count)
+                """INSERT OR REPLACE INTO run_reports
+                (period_id, article_count, storyline_count)
                 VALUES (?, ?, ?)""",
-                (week_number, article_count, storyline_count),
+                (period_id, article_count, storyline_count),
             )
             return cursor.lastrowid
+
+    def get_last_run_date(self) -> str | None:
+        """Get the end date from the most recent run report's period_id.
+
+        Returns the date string (YYYY-MM-DD) or None if no runs exist.
+        For range periods (YYYY-MM-DD..YYYY-MM-DD), returns the end date.
+        """
+        with self.connection() as conn:
+            row = conn.execute(
+                "SELECT period_id FROM run_reports ORDER BY period_id DESC LIMIT 1"
+            ).fetchone()
+            if not row:
+                return None
+            period_id = row["period_id"]
+            # Range format: "YYYY-MM-DD..YYYY-MM-DD" — return end date
+            if ".." in period_id:
+                return period_id.split("..")[1]
+            return period_id
 
     # --- Research Priorities ---
 
@@ -696,11 +714,11 @@ class Database:
             relevant = conn.execute(
                 "SELECT COUNT(*) as c FROM article_triage WHERE verdict = 'relevant'"
             ).fetchone()["c"]
-            weeks = conn.execute(
-                "SELECT COUNT(DISTINCT week_number) as c FROM articles"
+            periods = conn.execute(
+                "SELECT COUNT(DISTINCT period_id) as c FROM articles"
             ).fetchone()["c"]
             briefings = conn.execute(
-                "SELECT COUNT(*) as c FROM weekly_briefings"
+                "SELECT COUNT(*) as c FROM briefings"
             ).fetchone()["c"]
             storylines = conn.execute(
                 "SELECT COUNT(*) as c FROM storylines"
@@ -716,7 +734,7 @@ class Database:
                 "total_articles": total,
                 "triaged_articles": triaged,
                 "relevant_articles": relevant,
-                "weeks_with_articles": weeks,
+                "periods_with_articles": periods,
                 "briefings": briefings,
                 "storylines": storylines,
                 "total_priorities": priorities,
@@ -727,22 +745,38 @@ class Database:
 # --- Utility functions ---
 
 
-def get_current_week() -> str:
-    """Get current ISO week number string (e.g., '2026-W05')."""
-    now = datetime.now()
-    iso_cal = now.isocalendar()
-    return f"{iso_cal[0]}-W{iso_cal[1]:02d}"
+def get_today() -> str:
+    """Get today's date as YYYY-MM-DD string."""
+    return date.today().isoformat()
 
 
-def get_week_date_range(week_number: str) -> str:
-    """Get human-readable date range for a week number."""
+def make_period_id(start: str, end: str) -> str:
+    """Create a period_id from start and end dates.
+
+    If start == end, returns just the date (e.g., "2026-02-06").
+    Otherwise returns a range (e.g., "2026-02-01..2026-02-06").
+    """
+    if start == end:
+        return start
+    return f"{start}..{end}"
+
+
+def format_period_display(period_id: str) -> str:
+    """Format a period_id for human-readable display.
+
+    Single day: "Feb 06, 2026"
+    Range: "Feb 01 - Feb 06, 2026"
+    """
     try:
-        year, week = week_number.split("-W")
-        monday = datetime.strptime(f"{year}-W{int(week)}-1", "%Y-W%W-%w")
-        sunday = monday + timedelta(days=6)
-        return f"{monday.strftime('%b %d')} - {sunday.strftime('%b %d, %Y')}"
+        if ".." in period_id:
+            start_str, end_str = period_id.split("..")
+            start = date.fromisoformat(start_str)
+            end = date.fromisoformat(end_str)
+            return f"{start.strftime('%b %d')} - {end.strftime('%b %d, %Y')}"
+        d = date.fromisoformat(period_id)
+        return d.strftime("%b %d, %Y")
     except (ValueError, IndexError):
-        return week_number
+        return period_id
 
 
 def backup_database(db_path: str) -> str | None:

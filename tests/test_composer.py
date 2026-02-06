@@ -10,19 +10,19 @@ def test_compose_briefing(temp_db):
     """Test composing a full briefing."""
     # Set up storyline with narrative
     a1 = temp_db.insert_article(
-        url="https://a.com", title="A", content="C", week_number="2026-W05"
+        url="https://a.com", title="A", content="C", period_id="2026-02-06"
     )
     a2 = temp_db.insert_article(
-        url="https://b.com", title="B", content="C", week_number="2026-W05"
+        url="https://b.com", title="B", content="C", period_id="2026-02-06"
     )
     sid = temp_db.insert_storyline(
-        week_number="2026-W05", label="AI Testing", article_ids=[a1, a2]
+        period_id="2026-02-06", label="AI Testing", article_ids=[a1, a2]
     )
     temp_db.insert_storyline_narrative(
         storyline_id=sid,
-        week_number="2026-W05",
+        period_id="2026-02-06",
         title="AI Transforms Testing",
-        narrative_text="This week saw major changes in testing...",
+        narrative_text="Today saw major changes in testing...",
         source_references=[{"title": "A", "url": "https://a.com"}],
     )
 
@@ -35,21 +35,21 @@ def test_compose_briefing(temp_db):
     })
 
     composer = BriefingComposer(config={}, db=temp_db, provider=mock_provider)
-    briefing = composer.compose_briefing("2026-W05")
+    briefing = composer.compose_briefing("2026-02-06")
 
     assert briefing is not None
-    assert briefing.week_number == "2026-W05"
+    assert briefing.period_id == "2026-02-06"
     assert briefing.storyline_count == 1
     assert briefing.article_count == 2
     assert "AI testing tools" in briefing.tldr
     assert "AI Transforms Testing" in briefing.body_markdown
 
 
-def test_compose_empty_week(temp_db):
+def test_compose_empty_period(temp_db):
     """Test composing when no narratives exist."""
     mock_provider = MagicMock()
     composer = BriefingComposer(config={}, db=temp_db, provider=mock_provider)
-    briefing = composer.compose_briefing("2026-W05")
+    briefing = composer.compose_briefing("2026-02-06")
 
     assert briefing is not None
     assert briefing.article_count == 0
@@ -59,14 +59,14 @@ def test_compose_empty_week(temp_db):
 def test_compose_fallback_without_provider(temp_db):
     """Test composing with a provider that returns None falls back gracefully."""
     a1 = temp_db.insert_article(
-        url="https://a.com", title="A", content="C", week_number="2026-W05"
+        url="https://a.com", title="A", content="C", period_id="2026-02-06"
     )
     sid = temp_db.insert_storyline(
-        week_number="2026-W05", label="AI Testing", article_ids=[a1]
+        period_id="2026-02-06", label="AI Testing", article_ids=[a1]
     )
     temp_db.insert_storyline_narrative(
         storyline_id=sid,
-        week_number="2026-W05",
+        period_id="2026-02-06",
         title="AI Testing Narrative",
         narrative_text="Content here.",
     )
@@ -76,7 +76,7 @@ def test_compose_fallback_without_provider(temp_db):
     mock_provider.generate.return_value = None
 
     composer = BriefingComposer(config={}, db=temp_db, provider=mock_provider)
-    briefing = composer.compose_briefing("2026-W05")
+    briefing = composer.compose_briefing("2026-02-06")
 
     assert briefing is not None
     # Fallback TL;DR uses storyline titles as bullets

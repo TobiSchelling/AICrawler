@@ -2,6 +2,7 @@
 
 import logging
 import sys
+from datetime import date, timedelta
 from pathlib import Path
 
 import click
@@ -37,7 +38,7 @@ def load_config(config_path: str = "config.yaml") -> dict:
 @click.option("-c", "--config", default="config.yaml", help="Path to config file")
 @click.pass_context
 def main(ctx: click.Context, verbose: bool, config: str) -> None:
-    """AICrawler - Weekly AI news briefings."""
+    """AICrawler - Daily AI news briefings."""
     setup_logging(verbose)
     ctx.ensure_object(dict)
     ctx.obj["verbose"] = verbose
@@ -50,12 +51,15 @@ def main(ctx: click.Context, verbose: bool, config: str) -> None:
 def collect(ctx: click.Context) -> None:
     """Collect articles from configured sources."""
     from .collector import ArticleCollector
+    from .database import get_today
 
     config = ctx.obj["config"]
+    period_id = get_today()
+
     click.echo("Collecting articles from sources...")
 
     collector = ArticleCollector(config)
-    result = collector.collect()
+    result = collector.collect(period_id=period_id)
 
     click.echo("\nCollection complete:")
     click.echo(f"  Total found: {result.total_found}")
@@ -74,44 +78,79 @@ def collect(ctx: click.Context) -> None:
 def run(ctx: click.Context, dry_run: bool) -> None:
     """Run the full pipeline: collect -> fetch -> triage -> cluster -> synthesize -> compose."""
     from .collector import ArticleCollector
-    from .database import get_current_week, get_db
+    from .database import get_db, get_today, make_period_id
 
     config = ctx.obj["config"]
     db = get_db()
-    week_number = get_current_week()
+    today = get_today()
+
+    # Catch-up detection
+    last_run = db.get_last_run_date()
+    if last_run is None:
+        click.echo("First run detected — collecting today's articles.")
+        period_id = today
+        days_back = 1
+    else:
+        last_date = date.fromisoformat(last_run)
+        today_date = date.fromisoformat(today)
+        missed_days = (today_date - last_date).days
+
+        if missed_days <= 0:
+            click.echo(f"Already ran today ({today}). Re-running pipeline.")
+            period_id = today
+            days_back = 1
+        elif missed_days == 1:
+            click.echo(f"Daily run for {today}.")
+            period_id = today
+            days_back = 1
+        else:
+            # Catch-up: missed days
+            start_date = (last_date + timedelta(days=1)).isoformat()
+            period_id = make_period_id(start_date, today)
+            days_back = missed_days
+
+            if missed_days > 5:
+                click.echo(f"Last run was {missed_days} days ago ({last_run}).")
+                if not click.confirm(
+                    f"Catch up {missed_days} days ({period_id})? This will use more API calls"
+                ):
+                    click.echo("Aborted.")
+                    return
+            else:
+                click.echo(f"Catching up {missed_days} days ({period_id}).")
 
     # Step 1: Collect
-    click.echo("Step 1/6: Collecting articles...")
+    click.echo("\nStep 1/6: Collecting articles...")
     if dry_run:
-        articles = db.get_articles_for_week(week_number)
-        click.echo(f"  [dry-run] {len(articles)} articles already in DB for {week_number}")
+        articles = db.get_articles_for_period(period_id)
+        click.echo(f"  [dry-run] {len(articles)} articles already in DB for {period_id}")
     else:
-        collector = ArticleCollector(config)
-        collect_result = collector.collect()
+        collector = ArticleCollector(config, days_back=days_back)
+        collect_result = collector.collect(period_id=period_id)
         click.echo(f"  Found {collect_result.new_articles} new articles")
 
     # Step 2: Fetch content
     click.echo("\nStep 2/6: Fetching article content...")
     if dry_run:
-        needing_fetch = db.get_articles_needing_fetch(week_number)
+        needing_fetch = db.get_articles_needing_fetch(period_id)
         click.echo(f"  [dry-run] {len(needing_fetch)} articles need content fetching")
     else:
         from .content_fetcher import ContentFetcher
 
         fetcher = ContentFetcher(db=db)
-        fetch_result = fetcher.fetch_missing_content(week_number)
+        fetch_result = fetcher.fetch_missing_content(period_id)
         click.echo(f"  Fetched {fetch_result.fetched} articles, {fetch_result.failed} failed")
 
     # Step 3: Triage
     click.echo("\nStep 3/6: Triaging articles...")
     if dry_run:
-        untriaged = db.get_untriaged_articles(week_number)
+        untriaged = db.get_untriaged_articles(period_id)
         click.echo(f"  [dry-run] {len(untriaged)} articles need triage")
     else:
         from .triage import ArticleTriager
 
         triager = ArticleTriager(config=config, db=db)
-        triage_result = triager.triage_articles(week_number)
+        triage_result = triager.triage_articles(period_id)
         click.echo(
             f"  Triaged {triage_result.processed} articles: "
             f"{triage_result.relevant} relevant, {triage_result.skipped} skipped"
@@ -120,13 +159,13 @@ def run(ctx: click.Context, dry_run: bool) -> None:
     # Step 4: Cluster into storylines
     click.echo("\nStep 4/6: Clustering into storylines...")
     if dry_run:
-        relevant = db.get_relevant_articles(week_number)
+        relevant = db.get_relevant_articles(period_id)
         click.echo(f"  [dry-run] {len(relevant)} relevant articles to cluster")
     else:
         from .clusterer import ArticleClusterer
 
         clusterer = ArticleClusterer(db=db)
-        cluster_result = clusterer.cluster_articles(week_number)
+        cluster_result = clusterer.cluster_articles(period_id)
         click.echo(
             f"  Created {cluster_result.storyline_count} storylines "
             f"from {cluster_result.article_count} articles"
@@ -135,29 +174,29 @@ def run(ctx: click.Context, dry_run: bool) -> None:
     # Step 5: Synthesize storyline narratives
     click.echo("\nStep 5/6: Synthesizing narratives...")
     if dry_run:
-        storylines = db.get_storylines_for_week(week_number)
+        storylines = db.get_storylines_for_period(period_id)
         click.echo(f"  [dry-run] {len(storylines)} storylines need narratives")
     else:
         from .synthesizer import StorylineSynthesizer
 
         synthesizer = StorylineSynthesizer(config=config, db=db)
-        synth_result = synthesizer.synthesize_week(week_number)
+        synth_result = synthesizer.synthesize_period(period_id)
         click.echo(f"  Synthesized {synth_result.narratives_created} narratives")
 
-    # Step 6: Compose weekly briefing
-    click.echo("\nStep 6/6: Composing weekly briefing...")
+    # Step 6: Compose briefing
+    click.echo("\nStep 6/6: Composing briefing...")
     if dry_run:
-        briefing = db.get_briefing(week_number)
+        briefing = db.get_briefing(period_id)
         if briefing:
-            click.echo(f"  [dry-run] Briefing already exists for {week_number}")
+            click.echo(f"  [dry-run] Briefing already exists for {period_id}")
         else:
-            click.echo(f"  [dry-run] Would compose briefing for {week_number}")
+            click.echo(f"  [dry-run] Would compose briefing for {period_id}")
     else:
         from .composer import BriefingComposer
 
         composer = BriefingComposer(config=config, db=db)
-        briefing = composer.compose_briefing(week_number)
-        click.echo(f"  Briefing composed for {week_number}")
+        briefing = composer.compose_briefing(period_id)
+        click.echo(f"  Briefing composed for {period_id}")
         click.echo(f"  {briefing.storyline_count} storylines, {briefing.article_count} articles")
 
     click.echo("\nPipeline complete! Run 'aicrawler serve' to view the briefing.")
@@ -179,13 +218,13 @@ def serve(ctx: click.Context, port: int) -> None:
 @click.pass_context
 def status(ctx: click.Context) -> None:
     """Show database and system status."""
-    from .database import get_current_week, get_db
+    from .database import get_db, get_today
 
     db = get_db()
     stats = db.get_stats()
-    week = get_current_week()
+    today = get_today()
 
-    click.echo(f"Current week: {week}\n")
+    click.echo(f"Today: {today}\n")
     click.echo("Articles:")
     click.echo(f"  Total collected: {stats['total_articles']}")
     click.echo(f"  Triaged: {stats['triaged_articles']}")
@@ -193,7 +232,7 @@ def status(ctx: click.Context) -> None:
     click.echo("\nOutput:")
     click.echo(f"  Storylines: {stats['storylines']}")
     click.echo(f"  Briefings: {stats['briefings']}")
-    click.echo(f"  Weeks with data: {stats['weeks_with_articles']}")
+    click.echo(f"  Days with data: {stats['periods_with_articles']}")
     click.echo("\nResearch Priorities:")
     click.echo(f"  Total: {stats['total_priorities']}")
     click.echo(f"  Active: {stats['active_priorities']}")

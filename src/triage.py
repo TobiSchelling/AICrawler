@@ -8,7 +8,7 @@ from .llm import LLMProvider, create_provider, parse_json_response
 
 logger = logging.getLogger(__name__)
 
-TRIAGE_PROMPT = """You are triaging AI news articles for a weekly briefing aimed at people who build software.
+TRIAGE_PROMPT = """You are triaging AI news articles for a daily briefing aimed at people who build software.
 
 Decide whether this article is RELEVANT or should be SKIPPED.
 
@@ -59,13 +59,13 @@ class ArticleTriager:
         self.db = db or get_db()
         self.provider = provider or create_provider(config)
 
-    def triage_articles(self, week_number: str | None = None) -> TriageResult:
+    def triage_articles(self, period_id: str | None = None) -> TriageResult:
         """Triage all untriaged articles."""
         if not self.provider:
             logger.error("No LLM provider available for triage")
             return TriageResult(processed=0, relevant=0, skipped=0, errors=1)
 
-        articles = self.db.get_untriaged_articles(week_number)
+        articles = self.db.get_untriaged_articles(period_id)
         if not articles:
             logger.info("No articles pending triage")
             return TriageResult(processed=0, relevant=0, skipped=0, errors=0)

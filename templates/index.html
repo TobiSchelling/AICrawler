@@ -4,14 +4,14 @@
 
 {% block content %}
 <div class="container">
-    <h1>Weekly Briefings</h1>
+    <h1>Briefings</h1>
 
     {% if briefings %}
     <div class="archive-list">
         {% for b in briefings %}
-        <a href="{{ url_for('briefing', week=b.week_number) }}" class="archive-item">
-            <div class="archive-week">{{ b.week_number }}</div>
-            <div class="archive-date">{{ b.week_number | week_date_range }}</div>
+        <a href="{{ url_for('briefing', period_id=b.period_id) }}" class="archive-item">
+            <div class="archive-week">{{ b.period_id }}</div>
+            <div class="archive-date">{{ b.period_id | format_period }}</div>
             <div class="archive-meta">
                 <span>{{ b.storyline_count }} storylines</span>
                 <span>{{ b.article_count }} articles</span>

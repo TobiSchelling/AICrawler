@@ -1,15 +1,15 @@
-"""Compose full weekly briefing from storyline narratives."""
+"""Compose full briefing from storyline narratives."""
 
 import logging
 
-from .database import Database, WeeklyBriefing, get_db
+from .database import Briefing, Database, get_db
 from .llm import LLMProvider, create_provider, parse_json_response
 
 logger = logging.getLogger(__name__)
 
-COMPOSE_PROMPT = """You are writing the TL;DR for a weekly AI news briefing aimed at software practitioners.
+COMPOSE_PROMPT = """You are writing the TL;DR for a daily AI news briefing aimed at software practitioners.
 
-Here are this week's storylines and their narratives:
+Here are today's storylines and their narratives:
 
 {storylines}
 
@@ -28,7 +28,7 @@ BRIEFLY_NOTED_LABEL = "Briefly Noted"
 
 
 class BriefingComposer:
-    """Composes the final weekly briefing from storyline narratives."""
+    """Composes the final briefing from storyline narratives."""
 
     def __init__(
         self,
@@ -40,14 +40,14 @@ class BriefingComposer:
         self.db = db or get_db()
         self.provider = provider or create_provider(config)
 
-    def compose_briefing(self, week_number: str) -> WeeklyBriefing:
-        """Compose a complete weekly briefing."""
-        narratives = self.db.get_narratives_for_week(week_number)
-        storylines = self.db.get_storylines_for_week(week_number)
+    def compose_briefing(self, period_id: str) -> Briefing:
+        """Compose a complete briefing for a period."""
+        narratives = self.db.get_narratives_for_period(period_id)
+        storylines = self.db.get_storylines_for_period(period_id)
 
         if not narratives:
-            logger.warning("No narratives found for %s", week_number)
-            return self._store_empty_briefing(week_number)
+            logger.warning("No narratives found for %s", period_id)
+            return self._store_empty_briefing(period_id)
 
         # Generate TL;DR via LLM
         tldr = self._generate_tldr(narratives)
@@ -59,22 +59,22 @@ class BriefingComposer:
         article_count = sum(s.article_count for s in storylines)
 
         self.db.insert_briefing(
-            week_number=week_number,
+            period_id=period_id,
             tldr=tldr,
             body_markdown=body,
             storyline_count=len(storylines),
             article_count=article_count,
         )
 
-        # Also store a weekly report entry
+        # Also store a run report entry
         self.db.insert_report(
-            week_number=week_number,
+            period_id=period_id,
             article_count=article_count,
             storyline_count=len(storylines),
         )
 
-        result = self.db.get_briefing(week_number)
-        logger.info("Briefing composed for %s: %d storylines", week_number, len(storylines))
+        result = self.db.get_briefing(period_id)
+        logger.info("Briefing composed for %s: %d storylines", period_id, len(storylines))
         return result
 
     def _generate_tldr(self, narratives: list) -> str:
@@ -107,7 +107,7 @@ class BriefingComposer:
         for n in narratives:
             if n.title != BRIEFLY_NOTED_LABEL:
                 bullets.append(f"- {n.title}")
-        return "\n".join(bullets) if bullets else "- No significant storylines this week."
+        return "\n".join(bullets) if bullets else "- No significant storylines today."
 
     def _assemble_body(self, narratives: list, storylines: list) -> str:
         """Assemble the full briefing body as markdown."""
@@ -142,13 +142,13 @@ class BriefingComposer:
 
         return "\n\n---\n\n".join(sections)
 
-    def _store_empty_briefing(self, week_number: str) -> WeeklyBriefing:
+    def _store_empty_briefing(self, period_id: str) -> Briefing:
         """Store an empty briefing when there are no narratives."""
         self.db.insert_briefing(
-            week_number=week_number,
-            tldr="- No articles collected this week.",
-            body_markdown="No briefing content available for this week.",
+            period_id=period_id,
+            tldr="- No articles collected today.",
+            body_markdown="No briefing content available for this period.",
             storyline_count=0,
             article_count=0,
         )
-        return self.db.get_briefing(week_number)
+        return self.db.get_briefing(period_id)

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-AICrawler is a Python CLI tool that generates weekly narrative briefings about practical AI developments. It collects articles from RSS feeds and NewsAPI, triages them with LLMs, clusters related articles into storylines using sentence-transformer embeddings, synthesizes per-storyline narratives, and composes a cohesive weekly briefing served via a Flask web app.
+AICrawler is a Python CLI tool that generates daily narrative briefings about practical AI developments. It collects articles from RSS feeds and NewsAPI, triages them with LLMs, clusters related articles into storylines using sentence-transformer embeddings, synthesizes per-storyline narratives, and composes a cohesive briefing served via a Flask web app. Supports smart catch-up: if days are missed, one combined briefing covers the gap.
 
 ## Commands
 
@@ -22,7 +22,7 @@ uv run pytest tests/test_database.py -v           # Single file
 uv run pytest tests/test_database.py::test_name    # Single test
 
 # Run the app
-aicrawler run                     # Full 6-step pipeline
+aicrawler run                     # Full 6-step pipeline (daily, with catch-up)
 aicrawler run --dry-run           # Preview without executing
 aicrawler collect                 # Fetch articles only
 aicrawler serve                   # Flask on localhost:8000
@@ -52,15 +52,15 @@ Flask Web App (server.py → Jinja2 templates)
 | Module | Purpose |
 |--------|---------|
 | `src/llm.py` | LLM provider abstraction (LLMProvider ABC, OllamaProvider, OpenAIProvider, `create_provider`, `parse_json_response`) |
-| `src/collector.py` | Collects articles from RSS feeds and NewsAPI, inserts into DB |
+| `src/collector.py` | Collects articles from RSS feeds and NewsAPI, inserts into DB with `days_back` parameter |
 | `src/content_fetcher.py` | Fetches full article text via httpx + trafilatura for feeds with empty RSS content |
 | `src/triage.py` | Per-article LLM triage: verdict (relevant/skip), article_type, key_points, practical_score |
 | `src/clusterer.py` | Sentence-transformer embeddings + scipy agglomerative clustering into storylines |
 | `src/synthesizer.py` | Per-storyline LLM narrative; "Briefly Noted" gets bullet-point treatment (no LLM) |
-| `src/composer.py` | Assembles full weekly briefing with LLM-generated TL;DR |
+| `src/composer.py` | Assembles full briefing with LLM-generated TL;DR |
 | `src/database.py` | SQLite schema, dataclasses, CRUD operations |
 | `src/server.py` | Flask routes: archive, briefing view, priorities CRUD |
-| `src/cli.py` | Click CLI: `run`, `collect`, `serve`, `status`, `priorities` |
+| `src/cli.py` | Click CLI: `run` (with catch-up), `collect`, `serve`, `status`, `priorities` |
 | `src/feed_parser.py` | RSS/Atom feed parsing |
 | `src/api_client.py` | NewsAPI client |
 
@@ -76,29 +76,31 @@ SQLite via `database.py`. Key tables:
 
 | Table | Purpose |
 |-------|---------|
-| `articles` | Collected articles with `content_fetched` flag and `week_number` |
+| `articles` | Collected articles with `content_fetched` flag and `period_id` |
 | `article_triage` | LLM triage results: verdict, article_type, key_points (JSON), practical_score |
-| `storylines` | Clusters of related articles per week |
+| `storylines` | Clusters of related articles per period |
 | `storyline_articles` | Junction table: storyline ↔ article |
 | `storyline_narratives` | LLM-generated narrative per storyline with source_references (JSON) |
-| `weekly_briefings` | Final composed briefing: tldr + body_markdown |
+| `briefings` | Final composed briefing: tldr + body_markdown |
 | `research_priorities` | User-defined topics with keywords (JSON) |
-| `weekly_reports` | Metadata for weekly runs |
+| `run_reports` | Metadata for pipeline runs |
 
-Dataclasses: `Article`, `ArticleTriage`, `Storyline`, `StorylineNarrative`, `WeeklyBriefing`, `ResearchPriority`, `WeeklyReport`. Access via `get_db()` singleton; `reset_db()` for tests. JSON-serialized columns: `key_points`, `keywords`, `source_references`.
+Dataclasses: `Article`, `ArticleTriage`, `Storyline`, `StorylineNarrative`, `Briefing`, `ResearchPriority`, `RunReport`. Access via `get_db()` singleton; `reset_db()` for tests. JSON-serialized columns: `key_points`, `keywords`, `source_references`.
+
+Period IDs use `YYYY-MM-DD` format for single days or `YYYY-MM-DD..YYYY-MM-DD` for date ranges. Utility functions: `get_today()`, `make_period_id(start, end)`, `format_period_display(period_id)`.
 
 ### Web Routes
 
 | Route | Template | Purpose |
 |-------|----------|---------|
 | `GET /` | index.html | Archive listing (newest first) |
-| `GET /briefing/<week>` | briefing.html | Weekly briefing with TL;DR + narratives |
+| `GET /briefing/<period_id>` | briefing.html | Briefing with TL;DR + narratives |
 | `GET /priorities` | priorities.html | Research priority CRUD |
 | `POST /priorities/add` | — | Add priority |
 | `POST /priorities/<id>/toggle` | — | Toggle active state |
 | `POST /priorities/<id>/delete` | — | Delete priority |
 
-Briefing body is stored as markdown in DB, rendered to HTML at serve-time via Python `markdown` library (Jinja2 `|markdown` filter).
+Briefing body is stored as markdown in DB, rendered to HTML at serve-time via Python `markdown` library (Jinja2 `|markdown` filter). Period IDs are formatted for display via `|format_period` filter.
 
 ### Research Priorities
 
@@ -106,7 +108,7 @@ User-defined topics (e.g., "LLM Agents for Testing") that: generate additional N
 
 ### CLI Structure
 
-Click-based (`cli.py`). Top-level group with `--verbose` and `--config` options. Config loaded from `config.yaml` into `ctx.obj["config"]`. The `run` command executes the full 6-step pipeline with an optional `--dry-run` flag. All pipeline modules accept optional `db` parameter for testability.
+Click-based (`cli.py`). Top-level group with `--verbose` and `--config` options. Config loaded from `config.yaml` into `ctx.obj["config"]`. The `run` command detects catch-up scenarios via `db.get_last_run_date()`, computes the appropriate `period_id` and `days_back`, and confirms with the user if >5 days missed. All pipeline modules accept optional `db` parameter for testability.
 
 ## Key Conventions
 
@@ -131,7 +133,7 @@ def temp_db():
     reset_db()
 ```
 
-LLM-dependent tests mock the provider with `unittest.mock.MagicMock`. Test files: `test_database.py` (14 tests), `test_llm.py` (6), `test_triage.py` (5), `test_clusterer.py` (4), `test_synthesizer.py` (3), `test_composer.py` (3).
+LLM-dependent tests mock the provider with `unittest.mock.MagicMock`. Test files: `test_database.py` (19 tests), `test_llm.py` (6), `test_triage.py` (5), `test_clusterer.py` (4), `test_synthesizer.py` (3), `test_composer.py` (3).
 
 ## Configuration
 

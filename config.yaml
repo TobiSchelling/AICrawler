@@ -25,6 +25,8 @@ sources:
     # Commentary
     - url: "https://garymarcus.substack.com/feed"
       name: "Gary Marcus"
+    - url: "https://medium.com/@mitkovasilev/feed"
+      name: "Mitko Vasilev"
 
   apis:
     newsapi:

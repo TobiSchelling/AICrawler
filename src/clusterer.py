@@ -45,21 +45,21 @@ class ArticleClusterer:
             self._model = SentenceTransformer(self.model_name)
         return self._model
 
-    def cluster_articles(self, week_number: str) -> ClusterResult:
-        """Cluster relevant articles for a week into storylines."""
-        articles = self.db.get_relevant_articles(week_number)
+    def cluster_articles(self, period_id: str) -> ClusterResult:
+        """Cluster relevant articles for a period into storylines."""
+        articles = self.db.get_relevant_articles(period_id)
 
         if not articles:
-            logger.info("No relevant articles to cluster for %s", week_number)
+            logger.info("No relevant articles to cluster for %s", period_id)
             return ClusterResult(storyline_count=0, article_count=0, briefly_noted_count=0)
 
         # Clear existing storylines for re-clustering
-        self.db.clear_storylines_for_week(week_number)
+        self.db.clear_storylines_for_period(period_id)
 
         if len(articles) < 2:
             # Only one article — put it in Briefly Noted
             self.db.insert_storyline(
-                week_number=week_number,
+                period_id=period_id,
                 label=BRIEFLY_NOTED_LABEL,
                 article_ids=[a.id for a in articles],
             )
@@ -98,7 +98,7 @@ class ArticleClusterer:
         for group in storylines:
             label = self._generate_label(group)
             self.db.insert_storyline(
-                week_number=week_number,
+                period_id=period_id,
                 label=label,
                 article_ids=[a.id for a in group],
             )
@@ -107,7 +107,7 @@ class ArticleClusterer:
         briefly_noted_count = 0
         if briefly_noted:
             self.db.insert_storyline(
-                week_number=week_number,
+                period_id=period_id,
                 label=BRIEFLY_NOTED_LABEL,
                 article_ids=[a.id for a in briefly_noted],
             )

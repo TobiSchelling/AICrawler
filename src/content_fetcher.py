@@ -27,9 +27,9 @@ class ContentFetcher:
         self.db = db or get_db()
         self.timeout = timeout
 
-    def fetch_missing_content(self, week_number: str | None = None) -> FetchResult:
+    def fetch_missing_content(self, period_id: str | None = None) -> FetchResult:
         """Fetch content for articles that have empty content."""
-        articles = self.db.get_articles_needing_fetch(week_number)
+        articles = self.db.get_articles_needing_fetch(period_id)
 
         if not articles:
             logger.info("No articles need content fetching")
