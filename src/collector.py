@@ -59,7 +59,7 @@ class ArticleCollector:
         # Collect from RSS feeds
         if self.feed_parser:
             logger.info("Collecting from RSS feeds...")
-            feed_entries = self.feed_parser.parse_all()
+            feed_entries = self.feed_parser.parse_all(days_back=self.days_back)
             total_found += len(feed_entries)
 
             for entry in feed_entries:

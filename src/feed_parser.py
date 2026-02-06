@@ -2,12 +2,14 @@
 
 import logging
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from time import mktime
 
 import feedparser
 
 logger = logging.getLogger(__name__)
+
+MAX_PER_FEED = 20
 
 
 @dataclass
@@ -33,40 +35,59 @@ class FeedParser:
         """
         self.feeds = feeds
 
-    def parse_all(self) -> list[FeedEntry]:
-        """Parse all configured feeds and return entries."""
+    def parse_all(self, days_back: int = 1) -> list[FeedEntry]:
+        """Parse all configured feeds and return entries.
+
+        Args:
+            days_back: Only include entries published within this many days.
+        """
         all_entries: list[FeedEntry] = []
+        cutoff = datetime.now() - timedelta(days=days_back)
 
         for feed_config in self.feeds:
             url = feed_config["url"]
             name = feed_config.get("name", self._extract_source_name(url))
 
             try:
-                entries = self._parse_feed(url, name)
+                entries = self._parse_feed(url, name, cutoff)
                 all_entries.extend(entries)
-                logger.info(f"Parsed {len(entries)} entries from {name}")
+                logger.info("Parsed %d entries from %s (within %d days)", len(entries), name, days_back)
             except Exception as e:
-                logger.error(f"Failed to parse feed {url}: {e}")
+                logger.error("Failed to parse feed %s: %s", url, e)
 
         return all_entries
 
-    def _parse_feed(self, url: str, source_name: str) -> list[FeedEntry]:
-        """Parse a single feed URL."""
+    def _parse_feed(self, url: str, source_name: str, cutoff: datetime) -> list[FeedEntry]:
+        """Parse a single feed URL, filtering by date and capping at MAX_PER_FEED."""
         feed = feedparser.parse(url)
 
         if feed.bozo and feed.bozo_exception:
-            logger.warning(f"Feed parsing warning for {url}: {feed.bozo_exception}")
+            logger.warning("Feed parsing warning for %s: %s", url, feed.bozo_exception)
 
         entries = []
         for entry in feed.entries:
+            if len(entries) >= MAX_PER_FEED:
+                break
+
             try:
                 parsed = self._parse_entry(entry, source_name)
-                if parsed:
+                if parsed and self._is_within_window(parsed.published_date, cutoff):
                     entries.append(parsed)
             except Exception as e:
-                logger.warning(f"Failed to parse entry: {e}")
+                logger.warning("Failed to parse entry: %s", e)
 
         return entries
+
+    def _is_within_window(self, published_date: str | None, cutoff: datetime) -> bool:
+        """Check if an article's published date is within the collection window."""
+        if not published_date:
+            # No date available — include it (benefit of the doubt)
+            return True
+        try:
+            pub = datetime.strptime(published_date, "%Y-%m-%d")
+            return pub >= cutoff
+        except ValueError:
+            return True
 
     def _parse_entry(self, entry: feedparser.FeedParserDict, source: str) -> FeedEntry | None:
         """Parse a single feed entry."""

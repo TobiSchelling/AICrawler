@@ -2,6 +2,7 @@
 
 import logging
 from dataclasses import dataclass
+from urllib.parse import urlparse
 
 import httpx
 import trafilatura
@@ -37,8 +38,16 @@ class ContentFetcher:
 
         fetched = 0
         failed = 0
+        failed_domains: set[str] = set()
 
         for article in articles:
+            domain = urlparse(article.url).netloc.lower()
+            if domain in failed_domains:
+                self.db.mark_article_fetch_attempted(article.id)
+                failed += 1
+                logger.debug("Skipping %s (domain %s previously failed)", article.url, domain)
+                continue
+
             try:
                 content = self._fetch_article_content(article.url)
                 if content:
@@ -49,6 +58,14 @@ class ContentFetcher:
                     self.db.mark_article_fetch_attempted(article.id)
                     failed += 1
                     logger.debug("No extractable content from: %s", article.url)
+            except httpx.HTTPStatusError as e:
+                self.db.mark_article_fetch_attempted(article.id)
+                failed += 1
+                failed_domains.add(domain)
+                logger.warning(
+                    "HTTP %d for %s — skipping remaining articles from %s",
+                    e.response.status_code, article.url, domain,
+                )
             except Exception as e:
                 self.db.mark_article_fetch_attempted(article.id)
                 failed += 1
@@ -71,9 +88,8 @@ class ContentFetcher:
                 response = client.get(url)
                 response.raise_for_status()
                 html = response.text
-        except httpx.HTTPStatusError as e:
-            logger.debug("HTTP %d for %s", e.response.status_code, url)
-            return None
+        except httpx.HTTPStatusError:
+            raise
         except httpx.RequestError as e:
             logger.debug("Request error for %s: %s", url, e)
             return None
