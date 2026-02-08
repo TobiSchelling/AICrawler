@@ -795,11 +795,21 @@ def backup_database(db_path: str) -> str | None:
 _db_instance: Database | None = None
 
 
-def get_db(db_path: str | None = None) -> Database:
-    """Get or create the singleton Database instance."""
+def get_db(db_path: str | None = None, data_dir: str | None = None) -> Database:
+    """Get or create the singleton Database instance.
+
+    Priority: explicit db_path > data_dir/aicrawler.db > ~/.local/share/aicrawler/aicrawler.db
+    """
     global _db_instance
     if _db_instance is None:
-        _db_instance = Database(db_path or "data/aicrawler.db")
+        if db_path:
+            path = db_path
+        elif data_dir:
+            path = str(Path(data_dir) / "aicrawler.db")
+        else:
+            default_dir = Path.home() / ".local" / "share" / "aicrawler"
+            path = str(default_dir / "aicrawler.db")
+        _db_instance = Database(path)
     return _db_instance
 
 

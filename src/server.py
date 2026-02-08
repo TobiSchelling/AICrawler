@@ -10,14 +10,11 @@ from .database import format_period_display, get_db
 
 # Determine paths relative to this file
 SRC_DIR = Path(__file__).parent
-PROJECT_DIR = SRC_DIR.parent
-TEMPLATE_DIR = PROJECT_DIR / "templates"
-STATIC_DIR = PROJECT_DIR / "static"
 
 app = Flask(
     __name__,
-    template_folder=str(TEMPLATE_DIR),
-    static_folder=str(STATIC_DIR),
+    template_folder=str(SRC_DIR / "templates"),
+    static_folder=str(SRC_DIR / "static"),
 )
 
 app.secret_key = os.environ.get("SECRET_KEY", "dev-key-change-in-production")

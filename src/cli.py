@@ -1,6 +1,12 @@
 """CLI interface for AICrawler."""
 
+import importlib.resources
 import logging
+import os
+import shutil
+import signal
+import socket
+import subprocess
 import sys
 from datetime import date, timedelta
 from pathlib import Path
@@ -10,6 +16,9 @@ import yaml
 from dotenv import load_dotenv
 
 load_dotenv()
+
+CONFIG_DIR = Path.home() / ".config" / "aicrawler"
+DATA_DIR = Path.home() / ".local" / "share" / "aicrawler"
 
 
 def setup_logging(verbose: bool = False) -> None:
@@ -22,28 +31,82 @@ def setup_logging(verbose: bool = False) -> None:
     )
 
 
-def load_config(config_path: str = "config.yaml") -> dict:
-    """Load configuration from YAML file."""
-    path = Path(config_path)
-    if not path.exists():
-        click.echo(f"Error: Config file not found: {config_path}", err=True)
-        sys.exit(1)
+def resolve_config_path(explicit: str | None) -> Path:
+    """Resolve the config file path.
 
-    with open(path) as f:
+    Priority: --config flag > ~/.config/aicrawler/config.yaml > ./config.yaml
+    """
+    if explicit:
+        path = Path(explicit)
+        if not path.exists():
+            click.echo(f"Error: Config file not found: {explicit}", err=True)
+            sys.exit(1)
+        return path
+
+    xdg_config = CONFIG_DIR / "config.yaml"
+    if xdg_config.exists():
+        return xdg_config
+
+    cwd_config = Path("config.yaml")
+    if cwd_config.exists():
+        return cwd_config
+
+    click.echo(
+        "Error: No config file found. Searched:\n"
+        f"  {xdg_config}\n"
+        "  ./config.yaml\n"
+        "\nRun 'aicrawler init' to create a default config.",
+        err=True,
+    )
+    sys.exit(1)
+
+
+def load_config(config_path: Path) -> dict:
+    """Load configuration from YAML file."""
+    with open(config_path) as f:
         return yaml.safe_load(f)
+
+
+def get_data_dir(config: dict) -> str:
+    """Get the data directory path from config or XDG default."""
+    configured = config.get("output", {}).get("data_dir")
+    if configured:
+        return configured
+    return str(DATA_DIR)
 
 
 @click.group()
 @click.option("-v", "--verbose", is_flag=True, help="Enable verbose output")
-@click.option("-c", "--config", default="config.yaml", help="Path to config file")
+@click.option("-c", "--config", default=None, help="Path to config file")
 @click.pass_context
-def main(ctx: click.Context, verbose: bool, config: str) -> None:
+def main(ctx: click.Context, verbose: bool, config: str | None) -> None:
     """AICrawler - Daily AI news briefings."""
     setup_logging(verbose)
     ctx.ensure_object(dict)
     ctx.obj["verbose"] = verbose
-    ctx.obj["config_path"] = config
-    ctx.obj["config"] = load_config(config)
+
+    if ctx.invoked_subcommand == "init":
+        return
+
+    config_path = resolve_config_path(config)
+    ctx.obj["config_path"] = str(config_path)
+    ctx.obj["config"] = load_config(config_path)
+    ctx.obj["data_dir"] = get_data_dir(ctx.obj["config"])
+
+
+@main.command()
+def init() -> None:
+    """Initialize configuration in ~/.config/aicrawler/."""
+    target = CONFIG_DIR / "config.yaml"
+    if target.exists():
+        click.echo(f"Config already exists: {target}")
+        return
+
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    default_config = importlib.resources.files("src").joinpath("default_config.yaml")
+    shutil.copy2(str(default_config), str(target))
+    click.echo(f"Created config: {target}")
+    click.echo("Edit it to configure feeds, API keys, and LLM provider.")
 
 
 @main.command()
@@ -51,9 +114,10 @@ def main(ctx: click.Context, verbose: bool, config: str) -> None:
 def collect(ctx: click.Context) -> None:
     """Collect articles from configured sources."""
     from .collector import ArticleCollector
-    from .database import get_today
+    from .database import get_db, get_today
 
     config = ctx.obj["config"]
+    get_db(data_dir=ctx.obj["data_dir"])
     period_id = get_today()
 
     click.echo("Collecting articles from sources...")
@@ -82,7 +146,7 @@ def run(ctx: click.Context, dry_run: bool, days_back: int | None) -> None:
     from .database import get_db, get_today, make_period_id
 
     config = ctx.obj["config"]
-    db = get_db()
+    db = get_db(data_dir=ctx.obj["data_dir"])
     today = get_today()
 
     # Explicit --days-back override
@@ -209,12 +273,62 @@ def run(ctx: click.Context, dry_run: bool, days_back: int | None) -> None:
     click.echo("\nPipeline complete! Run 'aicrawler serve' to view the briefing.")
 
 
+def _stop_existing_server(port: int) -> bool:
+    """Stop a previous aicrawler server on the given port, if any.
+
+    Checks the port, identifies the PID via lsof, verifies it belongs to an
+    aicrawler process, and only then sends SIGTERM.  Returns True if a
+    process was stopped.
+    """
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        if s.connect_ex(("127.0.0.1", port)) != 0:
+            return False  # port is free
+
+    try:
+        result = subprocess.run(
+            ["lsof", "-ti", f"tcp:{port}"],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            return False
+        pids = [p.strip() for p in result.stdout.strip().splitlines() if p.strip()]
+    except (subprocess.SubprocessError, OSError):
+        return False
+
+    killed = False
+    for pid_str in pids:
+        try:
+            pid = int(pid_str)
+            ps_result = subprocess.run(
+                ["ps", "-p", str(pid), "-o", "command="],
+                capture_output=True,
+                text=True,
+            )
+            command = ps_result.stdout.strip()
+            if "aicrawler" not in command:
+                continue
+            os.kill(pid, signal.SIGTERM)
+            killed = True
+        except (ValueError, OSError):
+            continue
+
+    if killed:
+        import time
+
+        time.sleep(0.5)
+    return killed
+
+
 @main.command()
 @click.option("--port", "-p", default=8000, help="Port to run server on")
 @click.pass_context
 def serve(ctx: click.Context, port: int) -> None:
     """Start the local web server."""
     from .server import serve as start_server
+
+    if _stop_existing_server(port):
+        click.echo(f"Stopped previous aicrawler server on port {port}")
 
     click.echo(f"Starting server at http://localhost:{port}")
     click.echo("Press Ctrl+C to stop")
@@ -227,7 +341,7 @@ def status(ctx: click.Context) -> None:
     """Show database and system status."""
     from .database import get_db, get_today
 
-    db = get_db()
+    db = get_db(data_dir=ctx.obj["data_dir"])
     stats = db.get_stats()
     today = get_today()
 
@@ -249,9 +363,12 @@ def status(ctx: click.Context) -> None:
 
 
 @main.group()
-def priorities() -> None:
+@click.pass_context
+def priorities(ctx: click.Context) -> None:
     """Manage research priorities."""
-    pass
+    from .database import get_db
+
+    get_db(data_dir=ctx.obj["data_dir"])
 
 
 @priorities.command("list")

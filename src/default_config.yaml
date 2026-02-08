@@ -1,0 +1,92 @@
+# AICrawler Configuration
+# Created by: aicrawler init
+
+# Data sources
+sources:
+  feeds:
+    # Practitioners & experience reports
+    - url: "https://steipete.me/rss.xml"
+      name: "Peter Steinberger"
+    - url: "https://steve-yegge.medium.com/feed"
+      name: "Steve Yegge"
+    - url: "https://simonwillison.net/atom/everything/"
+      name: "Simon Willison"
+    - url: "https://www.oneusefulthing.org/feed"
+      name: "Ethan Mollick"
+    # Platforms & tooling
+    - url: "https://huggingface.co/blog/feed.xml"
+      name: "Hugging Face"
+    # Company blogs
+    - url: "https://blog.google/technology/ai/rss/"
+      name: "Google AI Blog"
+    - url: "https://openai.com/blog/rss.xml"
+      name: "OpenAI Blog"
+    - url: "https://www.anthropic.com/rss.xml"
+      name: "Anthropic"
+    # Commentary
+    - url: "https://garymarcus.substack.com/feed"
+      name: "Gary Marcus"
+    - url: "https://medium.com/@mitkovasilev/feed"
+      name: "Mitko Vasilev"
+
+  apis:
+    newsapi:
+      enabled: true
+      api_key_env: "NEWSAPI_KEY"
+      query: "artificial intelligence software development"
+
+# Keywords for filtering (boost articles containing these)
+keywords:
+  - "AI"
+  - "artificial intelligence"
+  - "machine learning"
+  - "LLM"
+  - "large language model"
+  - "GPT"
+  - "Claude"
+  - "software development"
+  - "software architecture"
+  - "software testing"
+  - "test automation"
+  - "MLOps"
+  - "DevOps"
+  - "code review"
+  - "code generation"
+  - "AI coding"
+  - "vibe coding"
+  - "agentic"
+  - "AI agent"
+  - "coding assistant"
+  - "experience report"
+  - "fine-tuning"
+  - "RAG"
+  - "prompt engineering"
+
+# Summarization settings
+summarization:
+  # Provider: "ollama" (default, local) or "openai" (cloud)
+  provider: "ollama"
+
+  # Ollama settings (used when provider is "ollama")
+  model: "qwen2.5:7b"
+  ollama_url: "http://localhost:11434"
+
+  # OpenAI settings (used when provider is "openai" or as fallback)
+  openai_model: "gpt-4o-mini"
+  api_key_env: "OPENAI_API_KEY"
+
+  # Shared settings
+  max_tokens: 512
+
+# Output settings
+# data_dir defaults to ~/.local/share/aicrawler if not set
+# output:
+#   data_dir: "~/.local/share/aicrawler"
+
+# Server settings
+server:
+  port: 8000
+
+# Logging
+logging:
+  level: "INFO"

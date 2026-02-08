@@ -9,8 +9,12 @@ AICrawler is a Python CLI tool that generates daily narrative briefings about pr
 ## Commands
 
 ```bash
-# Setup
+# Setup (development)
 uv venv && uv pip install -e ".[dev]"
+
+# Setup (Homebrew)
+brew install TobiSchelling/tap/aicrawler
+aicrawler init                    # Create ~/.config/aicrawler/config.yaml
 
 # Linting
 uv run ruff check src/
@@ -22,6 +26,7 @@ uv run pytest tests/test_database.py -v           # Single file
 uv run pytest tests/test_database.py::test_name    # Single test
 
 # Run the app
+aicrawler init                    # Initialize config (first-time setup)
 aicrawler run                     # Full 6-step pipeline (daily, with catch-up)
 aicrawler run --days-back 3       # Override lookback window (e.g. bootstrap fresh DB)
 aicrawler run --dry-run           # Preview without executing
@@ -61,9 +66,12 @@ Flask Web App (server.py → Jinja2 templates)
 | `src/composer.py` | Assembles full briefing with LLM-generated TL;DR |
 | `src/database.py` | SQLite schema, dataclasses, CRUD operations |
 | `src/server.py` | Flask routes: archive, briefing view, priorities CRUD |
-| `src/cli.py` | Click CLI: `run` (with catch-up), `collect`, `serve`, `status`, `priorities` |
+| `src/cli.py` | Click CLI: `run` (with catch-up), `collect`, `serve`, `status`, `priorities`, `init` |
 | `src/feed_parser.py` | RSS/Atom feed parsing |
 | `src/api_client.py` | NewsAPI client |
+| `src/templates/` | Jinja2 HTML templates (package data) |
+| `src/static/` | CSS stylesheets (package data) |
+| `src/default_config.yaml` | Bundled default config (copied by `aicrawler init`) |
 
 ### LLM Provider Abstraction
 
@@ -109,15 +117,18 @@ User-defined topics (e.g., "LLM Agents for Testing") that: generate additional N
 
 ### CLI Structure
 
-Click-based (`cli.py`). Top-level group with `--verbose` and `--config` options. Config loaded from `config.yaml` into `ctx.obj["config"]`. The `run` command auto-detects catch-up scenarios via `db.get_last_run_date()`, computes the appropriate `period_id` and `days_back`, and confirms with the user if >5 days missed. The `--days-back N` option overrides auto-detection, useful for bootstrapping a fresh database or testing. All pipeline modules accept optional `db` parameter for testability.
+Click-based (`cli.py`). Top-level group with `--verbose` and `--config` options. Config resolution: `--config` flag > `~/.config/aicrawler/config.yaml` > `./config.yaml`. Data directory: `config.output.data_dir` > `~/.local/share/aicrawler/`. The `init` command copies `src/default_config.yaml` to `~/.config/aicrawler/config.yaml`. The `run` command auto-detects catch-up scenarios via `db.get_last_run_date()`, computes the appropriate `period_id` and `days_back`, and confirms with the user if >5 days missed. The `--days-back N` option overrides auto-detection, useful for bootstrapping a fresh database or testing. All pipeline modules accept optional `db` parameter for testability.
 
 ## Key Conventions
 
 - Ruff: line-length 100, rules E/F/I/N/W/UP, E501 ignored
 - Type hints on all function signatures (`str | None` syntax, not `Optional`)
 - Conventional commits: `feat(triage): add article_type`, `fix(clusterer): threshold`
-- Config in `config.yaml`, secrets in `.env` (OPENAI_API_KEY, NEWSAPI_KEY)
+- Config: `~/.config/aicrawler/config.yaml` (XDG) or `./config.yaml` (dev); secrets in `.env`
+- Data: `~/.local/share/aicrawler/` (XDG default) or `config.output.data_dir`
+- Templates in `src/templates/`, static in `src/static/` (package data, not project root)
 - Templates: semantic HTML + CSS only, no JS frameworks
+- `sentence-transformers` is an optional `[ml]` extra (required for clustering)
 - CSS: dark mode via `prefers-color-scheme`, max-width ~65ch
 
 ## Test Patterns
@@ -139,3 +150,5 @@ LLM-dependent tests mock the provider with `unittest.mock.MagicMock`. Test files
 ## Configuration
 
 `config.yaml` drives source feeds, API settings, keywords, LLM provider choice (ollama/openai), model selection, data directory, and server port. Default: Ollama at `http://localhost:11434` with model `qwen2.5:7b`.
+
+Config resolution order: `--config` flag > `~/.config/aicrawler/config.yaml` > `./config.yaml`. Run `aicrawler init` to create the XDG config from the bundled default. The `output.data_dir` setting overrides the default database location (`~/.local/share/aicrawler/`).

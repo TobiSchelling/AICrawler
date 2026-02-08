@@ -5,9 +5,13 @@ from dataclasses import dataclass
 
 import numpy as np
 from scipy.cluster.hierarchy import fcluster, linkage
-from sentence_transformers import SentenceTransformer
 
 from .database import Article, Database, get_db
+
+try:
+    from sentence_transformers import SentenceTransformer
+except ImportError:
+    SentenceTransformer = None  # type: ignore[assignment,misc]
 
 logger = logging.getLogger(__name__)
 
@@ -37,10 +41,15 @@ class ArticleClusterer:
         self.db = db or get_db()
         self.model_name = model_name
         self.distance_threshold = distance_threshold
-        self._model: SentenceTransformer | None = None
+        self._model = None
 
     @property
-    def model(self) -> SentenceTransformer:
+    def model(self):
+        if SentenceTransformer is None:
+            raise ImportError(
+                "sentence-transformers is required for clustering. "
+                "Install it with: pip install 'aicrawler[ml]'"
+            )
         if self._model is None:
             self._model = SentenceTransformer(self.model_name)
         return self._model

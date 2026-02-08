@@ -1,7 +1,7 @@
 [project]
 name = "aicrawler"
 version = "0.2.0"
-description = "Weekly AI news briefings - collects, triages, clusters, and narrates AI developments"
+description = "Daily AI news briefings - collects, triages, clusters, and narrates AI developments"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -15,15 +15,18 @@ dependencies = [
     "pyyaml>=6.0",
     "python-dotenv>=1.0",
     "scipy>=1.11",
-    "sentence-transformers>=2.2.0",
     "trafilatura>=1.6",
 ]
 
 [project.optional-dependencies]
+ml = [
+    "sentence-transformers>=2.2.0",
+]
 dev = [
     "pytest>=8.0",
     "ruff>=0.4",
     "pytest-cov>=4.0",
+    "sentence-transformers>=2.2.0",
 ]
 
 [project.scripts]
