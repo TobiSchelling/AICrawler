@@ -235,7 +235,7 @@ def run(ctx: click.Context, dry_run: bool, days_back: int | None) -> None:
     else:
         from .clusterer import ArticleClusterer
 
-        clusterer = ArticleClusterer(db=db)
+        clusterer = ArticleClusterer(config=config, db=db)
         cluster_result = clusterer.cluster_articles(period_id)
         click.echo(
             f"  Created {cluster_result.storyline_count} storylines "

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-AICrawler is a Python CLI tool that generates daily narrative briefings about practical AI developments. It collects articles from RSS feeds and NewsAPI, triages them with LLMs, clusters related articles into storylines using sentence-transformer embeddings, synthesizes per-storyline narratives, and composes a cohesive briefing served via a Flask web app. Supports smart catch-up: if days are missed, one combined briefing covers the gap.
+AICrawler is a Python CLI tool that generates daily narrative briefings about practical AI developments. It collects articles from RSS feeds and NewsAPI, triages them with LLMs, clusters related articles into storylines using Ollama embeddings, synthesizes per-storyline narratives, and composes a cohesive briefing served via a Flask web app. Supports smart catch-up: if days are missed, one combined briefing covers the gap.
 
 ## Commands
 
@@ -47,7 +47,7 @@ RSS Feeds + NewsAPI
 SQLite DB (database.py)
     ↓ fetch content (content_fetcher.py: httpx + trafilatura)
     ↓ triage (triage.py: LLM → relevant/skip, key_points, practical_score)
-    ↓ cluster (clusterer.py: sentence-transformer embeddings + agglomerative clustering → storylines)
+    ↓ cluster (clusterer.py: Ollama embeddings + agglomerative clustering → storylines)
     ↓ synthesize (synthesizer.py: LLM per storyline → narrative)
     ↓ compose (composer.py: LLM → full briefing with TL;DR)
 Flask Web App (server.py → Jinja2 templates)
@@ -61,7 +61,7 @@ Flask Web App (server.py → Jinja2 templates)
 | `src/collector.py` | Collects articles from RSS feeds and NewsAPI, inserts into DB with `days_back` parameter |
 | `src/content_fetcher.py` | Fetches full article text via httpx + trafilatura for feeds with empty RSS content |
 | `src/triage.py` | Per-article LLM triage: verdict (relevant/skip), article_type, key_points, practical_score |
-| `src/clusterer.py` | Sentence-transformer embeddings + scipy agglomerative clustering into storylines |
+| `src/clusterer.py` | Ollama embeddings + scipy agglomerative clustering into storylines |
 | `src/synthesizer.py` | Per-storyline LLM narrative; "Briefly Noted" gets bullet-point treatment (no LLM) |
 | `src/composer.py` | Assembles full briefing with LLM-generated TL;DR |
 | `src/database.py` | SQLite schema, dataclasses, CRUD operations |
@@ -128,7 +128,7 @@ Click-based (`cli.py`). Top-level group with `--verbose` and `--config` options.
 - Data: `~/.local/share/aicrawler/` (XDG default) or `config.output.data_dir`
 - Templates in `src/templates/`, static in `src/static/` (package data, not project root)
 - Templates: semantic HTML + CSS only, no JS frameworks
-- `sentence-transformers` is an optional `[ml]` extra (required for clustering)
+- Embeddings via Ollama `embedding_model` (default: `nomic-embed-text`); no local ML dependencies
 - CSS: dark mode via `prefers-color-scheme`, max-width ~65ch
 
 ## Test Patterns
@@ -149,6 +149,6 @@ LLM-dependent tests mock the provider with `unittest.mock.MagicMock`. Test files
 
 ## Configuration
 
-`config.yaml` drives source feeds, API settings, keywords, LLM provider choice (ollama/openai), model selection, data directory, and server port. Default: Ollama at `http://localhost:11434` with model `qwen2.5:7b`.
+`config.yaml` drives source feeds, API settings, keywords, LLM provider choice (ollama/openai), model selection, embedding model, data directory, and server port. Default: Ollama at `http://localhost:11434` with model `qwen2.5:7b` and embedding model `nomic-embed-text`.
 
 Config resolution order: `--config` flag > `~/.config/aicrawler/config.yaml` > `./config.yaml`. Run `aicrawler init` to create the XDG config from the bundled default. The `output.data_dir` setting overrides the default database location (`~/.local/share/aicrawler/`).

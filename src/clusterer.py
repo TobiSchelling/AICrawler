@@ -1,22 +1,19 @@
-"""Sentence-transformer embeddings + agglomerative clustering into storylines."""
+"""Ollama embeddings + agglomerative clustering into storylines."""
 
 import logging
 from dataclasses import dataclass
 
+import httpx
 import numpy as np
 from scipy.cluster.hierarchy import fcluster, linkage
 
 from .database import Article, Database, get_db
 
-try:
-    from sentence_transformers import SentenceTransformer
-except ImportError:
-    SentenceTransformer = None  # type: ignore[assignment,misc]
-
 logger = logging.getLogger(__name__)
 
 BRIEFLY_NOTED_LABEL = "Briefly Noted"
-DEFAULT_MODEL = "all-MiniLM-L6-v2"
+DEFAULT_EMBEDDING_MODEL = "nomic-embed-text"
+DEFAULT_OLLAMA_URL = "http://localhost:11434"
 DEFAULT_DISTANCE_THRESHOLD = 1.2
 
 
@@ -34,25 +31,26 @@ class ArticleClusterer:
 
     def __init__(
         self,
+        config: dict | None = None,
         db: Database | None = None,
-        model_name: str = DEFAULT_MODEL,
         distance_threshold: float = DEFAULT_DISTANCE_THRESHOLD,
     ):
         self.db = db or get_db()
-        self.model_name = model_name
         self.distance_threshold = distance_threshold
-        self._model = None
+        summarization = (config or {}).get("summarization", {})
+        self.ollama_url = summarization.get("ollama_url", DEFAULT_OLLAMA_URL)
+        self.embedding_model = summarization.get("embedding_model", DEFAULT_EMBEDDING_MODEL)
 
-    @property
-    def model(self):
-        if SentenceTransformer is None:
-            raise ImportError(
-                "sentence-transformers is required for clustering. "
-                "Install it with: pip install 'aicrawler[ml]'"
-            )
-        if self._model is None:
-            self._model = SentenceTransformer(self.model_name)
-        return self._model
+    def _embed_texts(self, texts: list[str]) -> np.ndarray:
+        """Generate embeddings via Ollama /api/embed endpoint."""
+        response = httpx.post(
+            f"{self.ollama_url}/api/embed",
+            json={"model": self.embedding_model, "input": texts},
+            timeout=120.0,
+        )
+        response.raise_for_status()
+        data = response.json()
+        return np.array(data["embeddings"])
 
     def cluster_articles(self, period_id: str) -> ClusterResult:
         """Cluster relevant articles for a period into storylines."""
@@ -83,7 +81,7 @@ class ArticleClusterer:
 
         # Generate embeddings
         logger.info("Generating embeddings for %d articles...", len(articles))
-        embeddings = self.model.encode(texts, show_progress_bar=False)
+        embeddings = self._embed_texts(texts)
 
         # Agglomerative clustering
         clusters = self._cluster_embeddings(embeddings)

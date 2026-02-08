@@ -70,6 +70,7 @@ summarization:
   # Ollama settings (used when provider is "ollama")
   model: "qwen2.5:7b"
   ollama_url: "http://localhost:11434"
+  embedding_model: "nomic-embed-text"
 
   # OpenAI settings (used when provider is "openai" or as fallback)
   openai_model: "gpt-4o-mini"

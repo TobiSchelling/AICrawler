@@ -1,6 +1,6 @@
 """Tests for the clustering module."""
 
-from unittest.mock import MagicMock
+from unittest.mock import patch
 
 import numpy as np
 
@@ -54,10 +54,8 @@ def test_cluster_similar_articles_grouped(temp_db):
     )
     temp_db.insert_triage(article_id=aid, verdict="relevant", practical_score=2)
 
-    # Mock the model to return controllable embeddings
-    mock_model = MagicMock()
     # 3 similar embeddings + 1 different
-    mock_model.encode.return_value = np.array([
+    mock_embeddings = np.array([
         [1.0, 0.0, 0.0],
         [0.95, 0.05, 0.0],
         [0.9, 0.1, 0.0],
@@ -65,9 +63,9 @@ def test_cluster_similar_articles_grouped(temp_db):
     ])
 
     clusterer = ArticleClusterer(db=temp_db, distance_threshold=1.0)
-    clusterer._model = mock_model
 
-    result = clusterer.cluster_articles("2026-02-06")
+    with patch.object(clusterer, "_embed_texts", return_value=mock_embeddings):
+        result = clusterer.cluster_articles("2026-02-06")
 
     assert result.article_count == 4
     # Should have at least one storyline (the 3 similar) + briefly noted (the outlier)
