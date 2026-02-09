@@ -3,13 +3,18 @@ package server
 import (
 	"bytes"
 	"embed"
+	"errors"
 	"fmt"
 	"html/template"
 	"io/fs"
 	"log"
+	"net"
 	"net/http"
+	"os"
+	"os/exec"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/yuin/goldmark"
 
@@ -209,6 +214,41 @@ func Serve(db *database.DB, port int) error {
 	}
 
 	addr := fmt.Sprintf("127.0.0.1:%d", port)
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		if isAddrInUse(err) {
+			return fmt.Errorf("port %d already in use%s", port, identifyPortHolder(port))
+		}
+		return err
+	}
+
 	log.Printf("Server listening on http://%s", addr)
-	return http.ListenAndServe(addr, srv.Handler())
+	return http.Serve(ln, srv.Handler())
+}
+
+func isAddrInUse(err error) bool {
+	var opErr *net.OpError
+	if errors.As(err, &opErr) {
+		var sysErr *os.SyscallError
+		if errors.As(opErr.Err, &sysErr) {
+			return errors.Is(sysErr.Err, syscall.EADDRINUSE)
+		}
+	}
+	return false
+}
+
+// identifyPortHolder uses lsof to find which process holds the port.
+func identifyPortHolder(port int) string {
+	out, err := exec.Command("lsof", "-ti", fmt.Sprintf("tcp:%d", port)).Output()
+	if err != nil || len(out) == 0 {
+		return ""
+	}
+
+	pid := strings.TrimSpace(strings.SplitN(string(out), "\n", 2)[0])
+	cmd, err := exec.Command("ps", "-p", pid, "-o", "command=").Output()
+	if err != nil || len(cmd) == 0 {
+		return fmt.Sprintf(" (pid %s)", pid)
+	}
+
+	return fmt.Sprintf(" (pid %s: %s)", pid, strings.TrimSpace(string(cmd)))
 }
