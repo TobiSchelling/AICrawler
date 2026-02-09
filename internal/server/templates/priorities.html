@@ -1,0 +1,78 @@
+{{define "title"}}Priorities - AI Briefing{{end}}
+
+{{define "content"}}
+<div class="container">
+    <h1>Research Priorities</h1>
+    <p class="page-description">
+        Priorities boost article relevance during triage and generate additional NewsAPI queries during collection.
+    </p>
+
+    <div class="add-priority-form">
+        <h2>Add Priority</h2>
+        <form action="/priorities/add" method="post">
+            <div class="form-group">
+                <label for="title">Title</label>
+                <input type="text" id="title" name="title" required
+                       placeholder="e.g., LLM Agents for Testing">
+            </div>
+            <div class="form-group">
+                <label for="description">Description (optional)</label>
+                <textarea id="description" name="description" rows="2"
+                          placeholder="What specifically interests you about this topic?"></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary">Add Priority</button>
+        </form>
+    </div>
+
+    {{if .Priorities}}
+    <div class="priorities-list">
+        {{range .Priorities}}
+        <div class="priority-item {{if not .IsActive}}inactive{{end}}">
+            <div class="priority-header">
+                <div class="priority-status">
+                    <span class="status-indicator {{if .IsActive}}active{{else}}inactive{{end}}">
+                        {{if .IsActive}}*{{else}}o{{end}}
+                    </span>
+                </div>
+                <div class="priority-content">
+                    <h3>{{.Title}}</h3>
+                    {{if deref .Description}}
+                    <p class="priority-description">{{deref .Description}}</p>
+                    {{end}}
+                </div>
+                <div class="priority-actions">
+                    <form action="/priorities/{{.ID}}/toggle" method="post" class="inline-form">
+                        <button type="submit" class="btn btn-small">
+                            {{if .IsActive}}Disable{{else}}Enable{{end}}
+                        </button>
+                    </form>
+                    <form action="/priorities/{{.ID}}/delete" method="post" class="inline-form">
+                        <button type="submit" class="btn btn-small btn-danger">Delete</button>
+                    </form>
+                </div>
+            </div>
+
+            <details class="edit-form">
+                <summary>Edit</summary>
+                <form action="/priorities/{{.ID}}/edit" method="post">
+                    <div class="form-group">
+                        <label for="edit-title-{{.ID}}">Title</label>
+                        <input type="text" id="edit-title-{{.ID}}" name="title" value="{{.Title}}" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-desc-{{.ID}}">Description</label>
+                        <textarea id="edit-desc-{{.ID}}" name="description" rows="2">{{deref .Description}}</textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-small">Save</button>
+                </form>
+            </details>
+        </div>
+        {{end}}
+    </div>
+    {{else}}
+    <div class="empty-state">
+        <p>No priorities defined yet. Add one above to boost relevant articles.</p>
+    </div>
+    {{end}}
+</div>
+{{end}}

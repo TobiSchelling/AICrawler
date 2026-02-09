@@ -1,0 +1,27 @@
+{{define "title"}}Archive - AI Briefing{{end}}
+
+{{define "content"}}
+<div class="container">
+    <h1>Briefings</h1>
+
+    {{if .Briefings}}
+    <div class="archive-list">
+        {{range .Briefings}}
+        <a href="/briefing/{{.PeriodID}}" class="archive-item">
+            <div class="archive-week">{{.PeriodID}}</div>
+            <div class="archive-date">{{formatPeriod .PeriodID}}</div>
+            <div class="archive-meta">
+                <span>{{.StorylineCount}} storylines</span>
+                <span>{{.ArticleCount}} articles</span>
+            </div>
+        </a>
+        {{end}}
+    </div>
+    {{else}}
+    <div class="empty-state">
+        <p>No briefings yet.</p>
+        <p>Run <code>aicrawler run</code> to collect and process articles.</p>
+    </div>
+    {{end}}
+</div>
+{{end}}

@@ -1,0 +1,46 @@
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+    - go test ./...
+
+builds:
+  - main: ./cmd/aicrawler
+    binary: aicrawler
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+
+archives:
+  - format: tar.gz
+
+checksum:
+  name_template: 'checksums.txt'
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^chore:'
+
+brews:
+  - repository:
+      owner: TobiSchelling
+      name: homebrew-tap
+    homepage: "https://github.com/TobiSchelling/AICrawler"
+    description: "Daily AI news briefings"
+    license: "MIT"
+    install: |
+      bin.install "aicrawler"
+    test: |
+      assert_match "Daily AI news briefings", shell_output("#{bin}/aicrawler --help")

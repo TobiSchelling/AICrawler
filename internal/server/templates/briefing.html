@@ -1,0 +1,43 @@
+{{define "title"}}{{.PeriodID}} - AI Briefing{{end}}
+
+{{define "content"}}
+<div class="container">
+    {{if .Briefing}}
+    <article class="briefing">
+        <header class="briefing-header">
+            <h1>AI Briefing: {{formatPeriod .PeriodID}}</h1>
+            <p class="briefing-meta">
+                {{.PeriodID}}
+                &middot; {{.Briefing.StorylineCount}} storylines
+                &middot; {{.Briefing.ArticleCount}} articles
+            </p>
+        </header>
+
+        {{if .Briefing.TLDR}}
+        <section class="briefing-tldr">
+            <h2>TL;DR</h2>
+            <div class="tldr-content">
+                {{markdown .Briefing.TLDR}}
+            </div>
+        </section>
+        {{end}}
+
+        <section class="briefing-body">
+            {{markdown .Briefing.BodyMarkdown}}
+        </section>
+    </article>
+
+    <nav class="briefing-nav">
+        <a href="/">&larr; All briefings</a>
+    </nav>
+
+    {{else}}
+    <div class="empty-state">
+        <h1>{{formatPeriod .PeriodID}}</h1>
+        <p>No briefing available for this period.</p>
+        <p>Run <code>aicrawler run</code> to generate it.</p>
+        <a href="/">&larr; Back to archive</a>
+    </div>
+    {{end}}
+</div>
+{{end}}
