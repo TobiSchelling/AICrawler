@@ -23,6 +23,9 @@ sources:
       name: "OpenAI Blog"
     - url: "https://www.anthropic.com/rss.xml"
       name: "Anthropic"
+    # Testing & QA
+    - url: "https://swisstestingday.ch/feed/"
+      name: "Swiss Testing Day"
     # Commentary
     - url: "https://garymarcus.substack.com/feed"
       name: "Gary Marcus"
