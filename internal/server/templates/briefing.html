@@ -22,9 +22,69 @@
         </section>
         {{end}}
 
+        {{if .Storylines}}
+        <section class="briefing-storylines">
+            {{range .Storylines}}
+            <div class="storyline" id="storyline-{{.Narrative.StorylineID}}">
+                <div class="storyline-header">
+                    <h2>{{.Narrative.Title}}</h2>
+                    <div class="storyline-feedback">
+                        <form method="POST" action="/feedback/storyline/{{.Narrative.StorylineID}}/useful" class="inline-form">
+                            <input type="hidden" name="period_id" value="{{$.PeriodID}}">
+                            <button type="submit" class="btn-feedback{{if eq .Feedback "useful"}} active-useful{{end}}">Useful</button>
+                        </form>
+                        <form method="POST" action="/feedback/storyline/{{.Narrative.StorylineID}}/not_useful" class="inline-form">
+                            <input type="hidden" name="period_id" value="{{$.PeriodID}}">
+                            <button type="submit" class="btn-feedback{{if eq .Feedback "not_useful"}} active-not-useful{{end}}">Skip</button>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="storyline-narrative">
+                    {{markdown .Narrative.NarrativeText}}
+                </div>
+
+                {{if .Articles}}
+                <details class="storyline-sources">
+                    <summary>{{len .Articles}} sources</summary>
+                    <div class="article-list">
+                        {{range .Articles}}
+                        <div class="article-item">
+                            <div class="article-info">
+                                <a href="{{.Article.URL}}" target="_blank" rel="noopener" class="article-title">{{.Article.Title}}</a>
+                                <div class="article-meta">
+                                    {{if deref .Article.Source}}<span>{{deref .Article.Source}}</span>{{end}}
+                                    {{if .Triage}}
+                                        {{if deref .Triage.ArticleType}}<span>&middot; {{deref .Triage.ArticleType}}</span>{{end}}
+                                        {{if .Triage.PracticalScore}}<span>&middot; {{.Triage.PracticalScore}}/5</span>{{end}}
+                                    {{end}}
+                                </div>
+                            </div>
+                            <div class="article-feedback">
+                                <form method="POST" action="/feedback/article/{{.Article.ID}}/positive" class="inline-form">
+                                    <input type="hidden" name="period_id" value="{{$.PeriodID}}">
+                                    <input type="hidden" name="storyline_id" value="{{.StorylineID}}">
+                                    <button type="submit" class="btn-feedback-sm{{if eq .Feedback "positive"}} active-useful{{end}}" title="Useful">+</button>
+                                </form>
+                                <form method="POST" action="/feedback/article/{{.Article.ID}}/negative" class="inline-form">
+                                    <input type="hidden" name="period_id" value="{{$.PeriodID}}">
+                                    <input type="hidden" name="storyline_id" value="{{.StorylineID}}">
+                                    <button type="submit" class="btn-feedback-sm{{if eq .Feedback "negative"}} active-not-useful{{end}}" title="Not useful">&minus;</button>
+                                </form>
+                            </div>
+                        </div>
+                        {{end}}
+                    </div>
+                </details>
+                {{end}}
+            </div>
+            {{end}}
+        </section>
+        {{else}}
         <section class="briefing-body">
             {{markdown .Briefing.BodyMarkdown}}
         </section>
+        {{end}}
     </article>
 
     <nav class="briefing-nav">

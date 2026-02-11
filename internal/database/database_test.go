@@ -370,6 +370,134 @@ func TestGetLastRunDateRange(t *testing.T) {
 	}
 }
 
+func TestStorylineFeedbackLifecycle(t *testing.T) {
+	db := openTestDB(t)
+	a1, _ := db.InsertArticle("https://a.com", "A", nil, nil, nil, ptr("2026-02-06"))
+	sid, _ := db.InsertStoryline("2026-02-06", "AI Testing", []int64{a1})
+
+	// Upsert feedback
+	if err := db.UpsertStorylineFeedback(sid, "2026-02-06", "useful"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Read back
+	fb, err := db.GetStorylineFeedback(sid)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fb == nil || fb.Rating != "useful" {
+		t.Error("expected 'useful' rating")
+	}
+
+	// Map retrieval
+	m, _ := db.GetStorylineFeedbackMap("2026-02-06")
+	if m[sid] != "useful" {
+		t.Errorf("expected map entry 'useful', got %q", m[sid])
+	}
+
+	// Update rating (upsert replaces)
+	db.UpsertStorylineFeedback(sid, "2026-02-06", "not_useful")
+	fb, _ = db.GetStorylineFeedback(sid)
+	if fb == nil || fb.Rating != "not_useful" {
+		t.Error("expected 'not_useful' after update")
+	}
+
+	// Delete (toggle off)
+	db.DeleteStorylineFeedback(sid)
+	fb, _ = db.GetStorylineFeedback(sid)
+	if fb != nil {
+		t.Error("expected nil after delete")
+	}
+}
+
+func TestArticleFeedbackLifecycle(t *testing.T) {
+	db := openTestDB(t)
+	a1, _ := db.InsertArticle("https://a.com", "A", ptr("BlogSource"), nil, nil, ptr("2026-02-06"))
+	a2, _ := db.InsertArticle("https://b.com", "B", ptr("NewsSource"), nil, nil, ptr("2026-02-06"))
+
+	// Upsert feedback
+	db.UpsertArticleFeedback(a1, "positive")
+	db.UpsertArticleFeedback(a2, "negative")
+
+	fb, _ := db.GetArticleFeedback(a1)
+	if fb == nil || fb.Rating != "positive" {
+		t.Error("expected 'positive' rating for a1")
+	}
+
+	// Map retrieval
+	m, _ := db.GetArticleFeedbackMap([]int64{a1, a2})
+	if m[a1] != "positive" {
+		t.Errorf("expected 'positive' for a1, got %q", m[a1])
+	}
+	if m[a2] != "negative" {
+		t.Errorf("expected 'negative' for a2, got %q", m[a2])
+	}
+
+	// Empty ID list
+	empty, _ := db.GetArticleFeedbackMap(nil)
+	if len(empty) != 0 {
+		t.Errorf("expected empty map, got %d entries", len(empty))
+	}
+
+	// Delete
+	db.DeleteArticleFeedback(a1)
+	fb, _ = db.GetArticleFeedback(a1)
+	if fb != nil {
+		t.Error("expected nil after delete")
+	}
+}
+
+func TestGetFeedbackSummary(t *testing.T) {
+	db := openTestDB(t)
+	a1, _ := db.InsertArticle("https://a.com", "A", ptr("SwissTesting"), nil, nil, ptr("2026-02-06"))
+	a2, _ := db.InsertArticle("https://b.com", "B", ptr("SwissTesting"), nil, nil, ptr("2026-02-06"))
+	a3, _ := db.InsertArticle("https://c.com", "C", ptr("TechBlog"), nil, nil, ptr("2026-02-06"))
+
+	// Add triage info for article type grouping
+	at1 := "experience_report"
+	at2 := "commentary"
+	db.InsertTriage(a1, "relevant", &at1, nil, nil, 4)
+	db.InsertTriage(a2, "relevant", &at1, nil, nil, 3)
+	db.InsertTriage(a3, "relevant", &at2, nil, nil, 2)
+
+	// Add feedback
+	db.UpsertArticleFeedback(a1, "positive")
+	db.UpsertArticleFeedback(a2, "positive")
+	db.UpsertArticleFeedback(a3, "negative")
+
+	summary, err := db.GetFeedbackSummary()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Should have 2 sources
+	if len(summary.Sources) != 2 {
+		t.Fatalf("expected 2 sources, got %d", len(summary.Sources))
+	}
+	// SwissTesting should be first (highest net positive)
+	if summary.Sources[0].Source != "SwissTesting" {
+		t.Errorf("expected SwissTesting first, got %q", summary.Sources[0].Source)
+	}
+	if summary.Sources[0].Positive != 2 {
+		t.Errorf("expected 2 positive for SwissTesting, got %d", summary.Sources[0].Positive)
+	}
+
+	// Should have 2 article types
+	if len(summary.Types) != 2 {
+		t.Fatalf("expected 2 types, got %d", len(summary.Types))
+	}
+
+	// Empty summary
+	db2 := openTestDB(t)
+	empty, _ := db2.GetFeedbackSummary()
+	if empty == nil {
+		t.Fatal("expected non-nil summary")
+	}
+	if len(empty.Sources) != 0 || len(empty.Types) != 0 {
+		t.Error("expected empty summary")
+	}
+}
+
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || len(s) > 0 && containsStr(s, substr))
 }

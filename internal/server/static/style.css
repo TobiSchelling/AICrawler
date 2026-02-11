@@ -459,6 +459,178 @@ code {
     margin-top: var(--spacing-md);
 }
 
+/* === Storyline Sections === */
+.briefing-storylines {
+    margin-top: var(--spacing-lg);
+}
+
+.storyline {
+    padding-bottom: var(--spacing-xl);
+    margin-bottom: var(--spacing-xl);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.storyline:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+}
+
+.storyline-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: var(--spacing-md);
+}
+
+.storyline-header h2 {
+    margin: 0;
+    flex: 1;
+}
+
+.storyline-feedback {
+    display: flex;
+    gap: var(--spacing-xs);
+    flex-shrink: 0;
+    padding-top: 2px;
+}
+
+.storyline-narrative {
+    line-height: 1.8;
+    margin-top: var(--spacing-md);
+}
+
+.storyline-narrative p {
+    margin-bottom: var(--spacing-md);
+    max-width: 65ch;
+}
+
+/* === Feedback Buttons === */
+.btn-feedback {
+    display: inline-block;
+    padding: var(--spacing-xs) var(--spacing-sm);
+    background: var(--color-bg-alt);
+    color: var(--color-text-muted);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.btn-feedback:hover {
+    background: var(--color-border);
+    color: var(--color-text);
+}
+
+.btn-feedback.active-useful {
+    background: var(--color-success);
+    color: white;
+    border-color: var(--color-success);
+}
+
+.btn-feedback.active-not-useful {
+    background: var(--color-danger);
+    color: white;
+    border-color: var(--color-danger);
+    opacity: 0.8;
+}
+
+.btn-feedback-sm {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    background: var(--color-bg-alt);
+    color: var(--color-text-muted);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.btn-feedback-sm:hover {
+    background: var(--color-border);
+    color: var(--color-text);
+}
+
+.btn-feedback-sm.active-useful {
+    background: var(--color-success);
+    color: white;
+    border-color: var(--color-success);
+}
+
+.btn-feedback-sm.active-not-useful {
+    background: var(--color-danger);
+    color: white;
+    border-color: var(--color-danger);
+    opacity: 0.8;
+}
+
+/* === Source Articles === */
+.storyline-sources {
+    margin-top: var(--spacing-md);
+}
+
+.storyline-sources summary {
+    cursor: pointer;
+    color: var(--color-text-muted);
+    font-size: 0.9rem;
+    padding: var(--spacing-xs) 0;
+}
+
+.storyline-sources summary:hover {
+    color: var(--color-primary);
+}
+
+.article-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+    margin-top: var(--spacing-sm);
+}
+
+.article-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: var(--color-bg-alt);
+    border-radius: var(--radius);
+}
+
+.article-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.article-title {
+    display: block;
+    font-weight: 500;
+    font-size: 0.9rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.article-meta {
+    display: flex;
+    gap: var(--spacing-xs);
+    color: var(--color-text-muted);
+    font-size: 0.8rem;
+    margin-top: 2px;
+}
+
+.article-feedback {
+    display: flex;
+    gap: 2px;
+    flex-shrink: 0;
+}
+
 /* === Empty State === */
 .empty-state {
     text-align: center;
@@ -487,5 +659,26 @@ ul {
 
     .priority-actions {
         margin-top: var(--spacing-sm);
+    }
+
+    .storyline-header {
+        flex-direction: column;
+    }
+
+    .storyline-feedback {
+        margin-top: var(--spacing-xs);
+    }
+
+    .article-item {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .article-feedback {
+        margin-top: var(--spacing-xs);
+    }
+
+    .article-title {
+        white-space: normal;
     }
 }

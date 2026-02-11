@@ -84,11 +84,25 @@ CREATE TABLE IF NOT EXISTS run_reports (
     storyline_count INTEGER DEFAULT 0
 );
 
+CREATE TABLE IF NOT EXISTS storyline_feedback (
+    storyline_id INTEGER PRIMARY KEY REFERENCES storylines(id),
+    period_id TEXT NOT NULL,
+    rating TEXT NOT NULL CHECK(rating IN ('useful', 'not_useful')),
+    created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS article_feedback (
+    article_id INTEGER PRIMARY KEY REFERENCES articles(id),
+    rating TEXT NOT NULL CHECK(rating IN ('positive', 'negative')),
+    created_at TEXT DEFAULT (datetime('now'))
+);
+
 CREATE INDEX IF NOT EXISTS idx_articles_period ON articles(period_id);
 CREATE INDEX IF NOT EXISTS idx_articles_url ON articles(url);
 CREATE INDEX IF NOT EXISTS idx_storylines_period ON storylines(period_id);
 CREATE INDEX IF NOT EXISTS idx_storyline_narratives_period ON storyline_narratives(period_id);
 CREATE INDEX IF NOT EXISTS idx_briefings_period ON briefings(period_id);
+CREATE INDEX IF NOT EXISTS idx_storyline_feedback_period ON storyline_feedback(period_id);
 `
 
 // DB wraps a SQLite database connection.

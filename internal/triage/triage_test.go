@@ -117,6 +117,77 @@ func TestTriageSkipsAlreadyTriaged(t *testing.T) {
 	}
 }
 
+func TestTriageWithFeedbackSummary(t *testing.T) {
+	db := openTestDB(t)
+	// Create articles with sources
+	a1, _ := db.InsertArticle("https://a.com", "Good Article", ptr("SwissTesting"), nil, ptr("Content A"), ptr("2026-02-06"))
+	a2, _ := db.InsertArticle("https://b.com", "Bad Article", ptr("SpamBlog"), nil, ptr("Content B"), ptr("2026-02-06"))
+
+	// Add triage for article types
+	at := "experience_report"
+	db.InsertTriage(a1, "relevant", &at, nil, nil, 4)
+	at2 := "announcement"
+	db.InsertTriage(a2, "relevant", &at2, nil, nil, 2)
+
+	// Add feedback
+	db.UpsertArticleFeedback(a1, "positive")
+	db.UpsertArticleFeedback(a2, "negative")
+
+	// Now create a new untriaged article to triage
+	db.InsertArticle("https://c.com", "New AI Testing Article", ptr("SwissTesting"), nil, ptr("New content about testing"), ptr("2026-02-06"))
+
+	resp, _ := json.Marshal(map[string]any{
+		"verdict":          "relevant",
+		"article_type":     "experience_report",
+		"key_points":       []string{"Testing insight"},
+		"relevance_reason": "Matches preferred source",
+		"practical_score":  4,
+	})
+
+	// Capture the prompt sent to the LLM to verify feedback injection
+	var capturedPrompt string
+	provider := &mockProvider{response: string(resp)}
+	captureProvider := &promptCapture{inner: provider}
+
+	triager := NewTriager(db, captureProvider)
+	result := triager.TriageArticles(context.Background(), "2026-02-06")
+
+	if result.Processed != 1 {
+		t.Errorf("expected 1 processed, got %d", result.Processed)
+	}
+
+	capturedPrompt = captureProvider.lastPrompt
+	// Verify feedback patterns are in the prompt
+	if !containsStr(capturedPrompt, "SwissTesting") {
+		t.Error("expected 'SwissTesting' in triage prompt from feedback")
+	}
+	if !containsStr(capturedPrompt, "Preferred sources") {
+		t.Error("expected 'Preferred sources' in triage prompt")
+	}
+}
+
+// promptCapture wraps a provider and captures the last prompt.
+type promptCapture struct {
+	inner      *mockProvider
+	lastPrompt string
+}
+
+func (p *promptCapture) Generate(ctx context.Context, prompt string, maxTokens int) (string, error) {
+	p.lastPrompt = prompt
+	return p.inner.Generate(ctx, prompt, maxTokens)
+}
+
+func (p *promptCapture) IsConfigured() bool { return true }
+
+func containsStr(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
+}
+
 func TestTriageNoProvider(t *testing.T) {
 	db := openTestDB(t)
 	db.InsertArticle("https://example.com/test", "Test",

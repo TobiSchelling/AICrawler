@@ -100,3 +100,38 @@ type TriageStats struct {
 	Relevant int
 	Skipped  int
 }
+
+// StorylineFeedback holds a user rating for a storyline.
+type StorylineFeedback struct {
+	StorylineID int64
+	PeriodID    string
+	Rating      string // "useful" or "not_useful"
+	CreatedAt   *string
+}
+
+// ArticleFeedback holds a user rating for an article.
+type ArticleFeedback struct {
+	ArticleID int64
+	Rating    string // "positive" or "negative"
+	CreatedAt *string
+}
+
+// SourceFeedback aggregates feedback counts for a source.
+type SourceFeedback struct {
+	Source   string
+	Positive int
+	Negative int
+}
+
+// TypeFeedback aggregates feedback counts for an article type.
+type TypeFeedback struct {
+	ArticleType string
+	Positive    int
+	Negative    int
+}
+
+// FeedbackSummary aggregates all feedback for triage injection.
+type FeedbackSummary struct {
+	Sources []SourceFeedback
+	Types   []TypeFeedback
+}

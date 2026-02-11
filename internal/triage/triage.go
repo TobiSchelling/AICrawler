@@ -22,6 +22,9 @@ SKIP means: pure academic research papers, funding/investment announcements, mar
 Research priorities to give extra weight:
 %s
 
+Reader feedback patterns (use to calibrate relevance):
+%s
+
 Article Title: %s
 Source: %s
 Content:
@@ -78,9 +81,12 @@ func (t *Triager) TriageArticles(ctx context.Context, periodID string) *Result {
 	priorities, _ := t.db.GetActivePriorities()
 	prioritiesText := formatPriorities(priorities)
 
+	feedbackSummary, _ := t.db.GetFeedbackSummary()
+	feedbackText := formatFeedbackSummary(feedbackSummary)
+
 	r := &Result{}
 	for _, article := range articles {
-		result, err := t.triageArticle(ctx, article, prioritiesText)
+		result, err := t.triageArticle(ctx, article, prioritiesText, feedbackText)
 		if err != nil {
 			log.Printf("Error triaging article %d: %v", article.ID, err)
 			r.Errors++
@@ -115,7 +121,7 @@ type triageResult struct {
 	practicalScore int
 }
 
-func (t *Triager) triageArticle(ctx context.Context, article database.Article, prioritiesText string) (*triageResult, error) {
+func (t *Triager) triageArticle(ctx context.Context, article database.Article, prioritiesText, feedbackText string) (*triageResult, error) {
 	content := ""
 	if article.Content != nil {
 		content = *article.Content
@@ -132,7 +138,7 @@ func (t *Triager) triageArticle(ctx context.Context, article database.Article, p
 		source = *article.Source
 	}
 
-	prompt := fmt.Sprintf(triagePrompt, prioritiesText, article.Title, source, content)
+	prompt := fmt.Sprintf(triagePrompt, prioritiesText, feedbackText, article.Title, source, content)
 
 	responseText, err := t.provider.Generate(ctx, prompt, 512)
 	if err != nil {
@@ -208,6 +214,50 @@ func formatPriorities(priorities []database.ResearchPriority) string {
 			line += ": " + desc
 		}
 		lines = append(lines, line)
+	}
+	return strings.Join(lines, "\n")
+}
+
+func formatFeedbackSummary(summary *database.FeedbackSummary) string {
+	if summary == nil || (len(summary.Sources) == 0 && len(summary.Types) == 0) {
+		return "No feedback data yet."
+	}
+
+	var lines []string
+
+	// Preferred/penalized sources
+	var preferred, penalized []string
+	for _, s := range summary.Sources {
+		entry := fmt.Sprintf("  - %s (+%d/-%d)", s.Source, s.Positive, s.Negative)
+		if s.Positive > s.Negative {
+			preferred = append(preferred, entry)
+		} else if s.Negative > s.Positive {
+			penalized = append(penalized, entry)
+		}
+	}
+	if len(preferred) > 0 {
+		lines = append(lines, "Preferred sources:")
+		lines = append(lines, preferred...)
+	}
+	if len(penalized) > 0 {
+		lines = append(lines, "Sources reader tends to skip:")
+		lines = append(lines, penalized...)
+	}
+
+	// Preferred article types
+	var preferredTypes []string
+	for _, t := range summary.Types {
+		if t.Positive > t.Negative {
+			preferredTypes = append(preferredTypes, fmt.Sprintf("  - %s (%d positive)", t.ArticleType, t.Positive))
+		}
+	}
+	if len(preferredTypes) > 0 {
+		lines = append(lines, "Preferred article types:")
+		lines = append(lines, preferredTypes...)
+	}
+
+	if len(lines) == 0 {
+		return "No clear patterns yet."
 	}
 	return strings.Join(lines, "\n")
 }
