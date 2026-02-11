@@ -18,6 +18,15 @@
 # OS
 .DS_Store
 
+# Screenshots
+*.png
+
+# Playwright MCP
+.playwright-mcp/
+
+# Claude Code local settings
+.claude/settings.local.json
+
 # Python (legacy, remove once migration confirmed)
 __pycache__/
 *.py[cod]
