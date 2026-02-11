@@ -176,10 +176,36 @@ func (s *Server) handleBriefing(w http.ResponseWriter, r *http.Request) {
 		storylines = append(storylines, sv)
 	}
 
+	// Fallback: when no storylines exist, load articles directly for feedback
+	var articles []ArticleView
+	if len(storylines) == 0 && briefing != nil {
+		allArticles, err := s.db.GetArticlesForPeriod(periodID)
+		if err != nil {
+			log.Printf("error fetching articles for period %s: %v", periodID, err)
+		}
+		var articleIDs []int64
+		for _, a := range allArticles {
+			articleIDs = append(articleIDs, a.ID)
+		}
+		afMap, _ := s.db.GetArticleFeedbackMap(articleIDs)
+		for _, a := range allArticles {
+			triage, _ := s.db.GetTriage(a.ID)
+			if triage == nil || triage.Verdict != "relevant" {
+				continue
+			}
+			articles = append(articles, ArticleView{
+				Article:  a,
+				Triage:   triage,
+				Feedback: afMap[a.ID],
+			})
+		}
+	}
+
 	s.render(w, "briefing.html", map[string]any{
 		"Briefing":   briefing,
 		"PeriodID":   periodID,
 		"Storylines": storylines,
+		"Articles":   articles,
 	})
 }
 

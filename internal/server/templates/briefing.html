@@ -84,6 +84,37 @@
         <section class="briefing-body">
             {{markdown .Briefing.BodyMarkdown}}
         </section>
+        {{if .Articles}}
+        <section class="briefing-sources">
+            <h2>Sources</h2>
+            <div class="article-list">
+                {{range .Articles}}
+                <div class="article-item">
+                    <div class="article-info">
+                        <a href="{{.Article.URL}}" target="_blank" rel="noopener" class="article-title">{{.Article.Title}}</a>
+                        <div class="article-meta">
+                            {{if deref .Article.Source}}<span>{{deref .Article.Source}}</span>{{end}}
+                            {{if .Triage}}
+                                {{if deref .Triage.ArticleType}}<span>&middot; {{deref .Triage.ArticleType}}</span>{{end}}
+                                {{if .Triage.PracticalScore}}<span>&middot; {{.Triage.PracticalScore}}/5</span>{{end}}
+                            {{end}}
+                        </div>
+                    </div>
+                    <div class="article-feedback">
+                        <form method="POST" action="/feedback/article/{{.Article.ID}}/positive" class="inline-form">
+                            <input type="hidden" name="period_id" value="{{$.PeriodID}}">
+                            <button type="submit" class="btn-feedback-sm{{if eq .Feedback "positive"}} active-useful{{end}}" title="Relevant">+</button>
+                        </form>
+                        <form method="POST" action="/feedback/article/{{.Article.ID}}/negative" class="inline-form">
+                            <input type="hidden" name="period_id" value="{{$.PeriodID}}">
+                            <button type="submit" class="btn-feedback-sm{{if eq .Feedback "negative"}} active-not-useful{{end}}" title="Not relevant">&minus;</button>
+                        </form>
+                    </div>
+                </div>
+                {{end}}
+            </div>
+        </section>
+        {{end}}
         {{end}}
     </article>
 

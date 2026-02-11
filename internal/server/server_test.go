@@ -175,6 +175,39 @@ func TestBriefingStructured(t *testing.T) {
 	}
 }
 
+func TestBriefingFallbackShowsArticleFeedback(t *testing.T) {
+	db := openTestDB(t)
+	// Briefing exists but NO storyline narratives — the fallback path
+	aid, _ := db.InsertArticle("https://a.com", "Fallback Article", ptr("Src"), nil, nil, ptr("2026-02-06"))
+	at := "tutorial"
+	db.InsertTriage(aid, "relevant", &at, nil, nil, 3)
+	db.InsertBriefing("2026-02-06", "TL;DR", "## Body\nMarkdown content", 0, 1)
+
+	srv, err := New(db)
+	if err != nil {
+		t.Fatalf("failed to create server: %v", err)
+	}
+
+	req := httptest.NewRequest("GET", "/briefing/2026-02-06", nil)
+	rec := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+	body := rec.Body.String()
+
+	if !strings.Contains(body, "Markdown content") {
+		t.Error("expected briefing markdown body in response")
+	}
+	if !strings.Contains(body, "Fallback Article") {
+		t.Error("expected article title in fallback sources")
+	}
+	if !strings.Contains(body, "/feedback/article/") {
+		t.Error("expected article feedback form in fallback view")
+	}
+}
+
 func TestStaticRoute(t *testing.T) {
 	db := openTestDB(t)
 	srv, err := New(db)
