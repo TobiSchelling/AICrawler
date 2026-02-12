@@ -21,8 +21,6 @@ sources:
       name: "Google AI Blog"
     - url: "https://openai.com/blog/rss.xml"
       name: "OpenAI Blog"
-    - url: "https://www.anthropic.com/rss.xml"
-      name: "Anthropic"
     # Testing & QA
     - url: "https://swisstestingday.ch/feed/"
       name: "Swiss Testing Day"
