@@ -53,6 +53,15 @@ sources:
       name: "Washington Post Tech"
     - url: "https://www.nzz.ch/technologie.rss"
       name: "NZZ Technologie"
+    # Indian software industry & AI
+    - url: "https://economictimes.indiatimes.com/tech/rssfeeds/13357270.cms"
+      name: "Economic Times Tech"
+    - url: "https://www.livemint.com/rss/AI"
+      name: "LiveMint AI"
+    - url: "https://www.thehindubusinessline.com/info-tech/?service=rss"
+      name: "Hindu BusinessLine InfoTech"
+    - url: "https://inc42.com/feed/"
+      name: "Inc42"
 
   apis:
     newsapi:
