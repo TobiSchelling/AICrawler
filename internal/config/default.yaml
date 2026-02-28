@@ -29,6 +29,30 @@ sources:
       name: "Gary Marcus"
     - url: "https://medium.com/@mitkovasilev/feed"
       name: "Mitko Vasilev"
+    # Newspapers & magazines — AI-focused feeds
+    - url: "https://www.theguardian.com/technology/artificialintelligenceai/rss"
+      name: "The Guardian AI"
+    - url: "https://arstechnica.com/ai/feed/"
+      name: "Ars Technica AI"
+    - url: "https://www.technologyreview.com/topic/artificial-intelligence/feed"
+      name: "MIT Technology Review"
+    - url: "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml"
+      name: "The Verge AI"
+    - url: "https://techcrunch.com/category/artificial-intelligence/feed/"
+      name: "TechCrunch AI"
+    - url: "https://venturebeat.com/category/ai/feed/"
+      name: "VentureBeat AI"
+    - url: "https://www.wired.com/feed/tag/ai/latest/rss"
+      name: "Wired AI"
+    # Newspapers — broad tech (triage filters to AI)
+    - url: "https://feeds.bbci.co.uk/news/technology/rss.xml"
+      name: "BBC Technology"
+    - url: "https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml"
+      name: "New York Times Tech"
+    - url: "https://feeds.washingtonpost.com/rss/business/technology"
+      name: "Washington Post Tech"
+    - url: "https://www.nzz.ch/technologie.rss"
+      name: "NZZ Technologie"
 
   apis:
     newsapi:

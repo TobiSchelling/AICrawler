@@ -11,7 +11,7 @@ import (
 
 const (
 	BrieflyNotedLabel         = "Briefly Noted"
-	DefaultDistanceThreshold = 1.2
+	DefaultDistanceThreshold = 0.9
 )
 
 // Result holds the results of a clustering run.
