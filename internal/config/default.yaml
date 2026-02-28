@@ -21,6 +21,12 @@ sources:
       name: "Google AI Blog"
     - url: "https://openai.com/blog/rss.xml"
       name: "OpenAI Blog"
+    - url: "https://www.microsoft.com/en-us/research/blog/feed/"
+      name: "Microsoft Research"
+    - url: "https://aws.amazon.com/blogs/machine-learning/feed/"
+      name: "AWS Machine Learning"
+    - url: "https://engineering.fb.com/feed/"
+      name: "Meta Engineering"
     # Testing & QA
     - url: "https://swisstestingday.ch/feed/"
       name: "Swiss Testing Day"
