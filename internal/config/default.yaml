@@ -50,6 +50,9 @@ sources:
       name: "VentureBeat AI"
     - url: "https://www.wired.com/feed/tag/ai/latest/rss"
       name: "Wired AI"
+    # Business & strategy
+    - url: "http://feeds.harvardbusiness.org/harvardbusiness/"
+      name: "Harvard Business Review"
     # Newspapers — broad tech (triage filters to AI)
     - url: "https://feeds.bbci.co.uk/news/technology/rss.xml"
       name: "BBC Technology"
